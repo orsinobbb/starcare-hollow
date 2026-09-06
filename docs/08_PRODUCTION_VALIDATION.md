@@ -156,8 +156,23 @@
       │   ├─ Crafting
       │   ├─ StaffProgress
       │   └─ Collections
+      ├─ Expedition
+      │   ├─ SeededMap
+      │   ├─ ResonanceHints
+      │   └─ RelicRewards
+      ├─ PuzzleRoom
+      │   ├─ RuleEvaluator
+      │   ├─ LayeredHints
+      │   └─ ObservationMode
       ├─ Narrative
+      │   ├─ BranchGraph
+      │   ├─ SeenHistory
+      │   └─ TimelineFlags
+      ├─ Wardrobe
+      ├─ WishJournal
       ├─ SaveSystem
+      │   ├─ TimelineSave
+      │   └─ MemoryLedger
       └─ Presentation
 
 模擬層不得直接依賴畫面動畫。如此才能做快速批次模擬、固定種子測試和低特效模式。
@@ -179,6 +194,12 @@
 - Furniture
 - DialogueEvent
 - DistrictState
+- ExpeditionMap
+- PuzzleDefinition
+- NarrativeNode
+- ChoiceEdge
+- WardrobeItem
+- WishPage
 
 每筆資料有穩定 ID，顯示文字使用獨立 localization key。
 
@@ -380,4 +401,3 @@
 3. 做一個只有四類珠、三設備、三病患的灰盒班次。
 4. 找 5～8 位符合目標輪廓的玩家進行三局測試。
 5. 根據視線、理解和重試意願決定是否進入垂直切片。
-

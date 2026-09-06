@@ -210,7 +210,7 @@
 - 1 張固定 8×8 星砂地圖。
 - 3 個主要寶物、2 種地形、星鏟與回聲鏡。
 - 四級遠近提示、30 點專注、一次安全返回。
-- 結算顯示用量、發現物與下一次目標；暫不寫入永久存檔。
+- 結算顯示用量、發現物與下一次目標；地圖種子、已開格與發現物寫入 0.2.0 建立的共用存檔。
 
 驗收：第一次遊玩的玩家不看說明，也能在 5 分鐘內理解提示並找到至少一件寶物。
 
@@ -259,4 +259,4 @@
 Create a premium cozy fantasy game keyframe for an original game called Starcare Hollow. Show an isometric floating island expedition at golden sunset, viewed at a clear three-quarter angle. The island is divided into a readable 8 by 8 exploration grid made of star-sand, flower meadows, tangled moon-vines, pale crystal rocks, and a few ancient sealed tiles. About half the tiles are softly uncovered and half remain under translucent blue-violet mist. A cheerful short-haired young healer in an ochre travel jacket holds a brass star compass, accompanied by a small fluffy white cloud creature. One uncovered tile emits a strong four-point golden resonance star, nearby tiles show subtle concentric cyan clue rings, and a partially revealed ornate relic chest glows beneath the sand. Include a distant glass conservatory town and floating lighthouse islands, warm lanterns, botanical motifs, navy teal ivory lavender and restrained gold palette, painterly anime-inspired fantasy illustration, meticulous environment storytelling, crisp readable silhouettes, luminous but controlled magical particles, polished mobile game production art, inviting sense of discovery, no danger, no combat. Compose with generous clean margins for future UI overlay, especially top and right side. ORIGINAL IP ONLY, no existing game logos, no copied characters, no branded interface, no readable text, no letters, no numbers, no watermark, no collage, no split panels, no photorealism, no excessive bloom, no clutter obscuring the grid. 16:9 landscape.
 ```
 
-待好友聊天記錄補入後，優先核對四件事：她最記得哪一種挖掘回饋、是否喜歡體力等待、最在意收藏還是家園、以及對好友互助的接受程度。這四項會決定 0.2.x 原型的預設節奏，但不改變上述公平性底線。
+好友聊天記錄已補入，並確認她重視邏輯推理、分岔自由、存檔回溯、換裝與所有模式的共同累積；同時排斥傷眼找不同及付費卡關。完整轉譯與首輪測試規格見 [好友遊戲偏好轉譯與整合系統規格](11_FRIEND_PLAYSTYLE_SYSTEM_SPEC.md)。遠征仍需在實玩後確認：她偏好收藏完成、家園展示或最少步數推理中的哪一項作為第一動機。
