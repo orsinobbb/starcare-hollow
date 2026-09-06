@@ -35,6 +35,7 @@ npm start
 - [音樂與聲音規格](docs/07_AUDIO_DIRECTION.md)
 - [製作、技術與驗證](docs/08_PRODUCTION_VALIDATION.md)
 - [GitHub 發布與長期升級](docs/09_GITHUB_RELEASE_UPGRADE.md)
+- [Treasure Isle 研究與星脈遠征擴充](docs/10_TREASURE_ISLE_RESEARCH_AND_EXPANSION.md)
 
 ## 可匯入表格
 
