@@ -1,0 +1,17 @@
+# Operating systems and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Node tooling
+node_modules/
+npm-debug.log*
+coverage/
+
+# Local-only files
+.env
+.env.*
+!.env.example
+*.log
+

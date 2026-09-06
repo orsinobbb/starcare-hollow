@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#18243f" />
+    <meta
+      name="description"
+      content="《星癒小鎮》診所經營與連線盤雙層玩法的可玩灰盒原型"
+    />
+    <title>星癒小鎮｜療癒所灰盒原型</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#task-board">跳到任務盤</a>
+
+    <div class="app-shell">
+      <header class="game-header">
+        <div class="brand-block">
+          <span class="brand-mark" aria-hidden="true">✦</span>
+          <div>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">GRAYBOX v0.1.0</span></p>
+            <h1>星癒小鎮</h1>
+          </div>
+        </div>
+
+        <div class="hud" aria-label="班次狀態">
+          <div class="hud-stat hud-goal">
+            <span class="hud-label">今日目標</span>
+            <strong id="goal-value">0 / 5</strong>
+          </div>
+          <div class="hud-stat">
+            <span class="hud-label">波次</span>
+            <strong id="wave-value">1 / 3</strong>
+          </div>
+          <div class="hud-stat hud-time">
+            <span class="hud-label">剩餘時間</span>
+            <strong id="time-value">3:00</strong>
+          </div>
+          <div class="hud-stat hud-stability">
+            <span class="hud-label">療癒所安定</span>
+            <strong id="stability-value">100</strong>
+            <span class="mini-meter" aria-hidden="true"><span id="stability-bar"></span></span>
+          </div>
+        </div>
+
+        <nav class="header-actions" aria-label="遊戲控制">
+          <button id="help-button" class="icon-button" type="button" aria-label="開啟玩法說明">?</button>
+          <button id="toggle-input" class="control-button" type="button" aria-pressed="false">
+            點選模式：關
+          </button>
+          <button id="toggle-sound" class="icon-button" type="button" aria-pressed="true" aria-label="關閉音效">
+            ♪
+          </button>
+          <button id="pause-button" class="icon-button" type="button" aria-label="暫停" disabled>Ⅱ</button>
+        </nav>
+      </header>
+
+      <main id="main-content">
+        <section class="clinic-panel" aria-labelledby="clinic-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">照顧現場</p>
+              <h2 id="clinic-title">暖星療癒所</h2>
+            </div>
+            <p id="shift-message" class="shift-message" role="status" aria-live="polite">
+              班次尚未開始
+            </p>
+          </div>
+
+          <div class="clinic-content">
+            <div class="patient-area">
+              <div class="subheading-row">
+                <h3>來訪者</h3>
+                <span id="waiting-count" class="soft-chip">候診 0</span>
+              </div>
+              <div id="patient-list" class="patient-list" aria-live="polite"></div>
+            </div>
+
+            <div class="station-area">
+              <h3 class="visually-hidden">工作站需求</h3>
+              <div id="station-list" class="station-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="play-area" aria-labelledby="board-title">
+          <aside class="side-panel demand-panel" aria-labelledby="demand-title">
+            <div>
+              <p class="eyebrow">現在最需要</p>
+              <h2 id="demand-title">工作需求</h2>
+            </div>
+            <div id="demand-list" class="demand-list"></div>
+            <p class="side-note">盤面補珠會輕微偏向當下需求，不會保證答案。</p>
+          </aside>
+
+          <div class="board-card">
+            <div class="board-toolbar">
+              <div>
+                <p class="eyebrow">連線工作盤</p>
+                <h2 id="board-title">拖曳相同符號，至少三顆</h2>
+              </div>
+              <div class="chain-readout" aria-live="polite">
+                <strong id="chain-summary">尚未選取</strong>
+                <span id="chain-preview">5 顆開始生成特殊珠</span>
+              </div>
+            </div>
+
+            <div id="board-wrap" class="board-wrap">
+              <svg id="path-layer" class="path-layer" aria-hidden="true"></svg>
+              <div
+                id="task-board"
+                class="task-board"
+                role="grid"
+                aria-label="七欄六列任務盤。方向鍵移動，空白鍵選取，Enter 完成，Escape 取消。"
+              ></div>
+              <div id="board-lock" class="board-lock" aria-hidden="true">
+                <span>Ⅱ</span>
+                <strong>班次暫停</strong>
+              </div>
+            </div>
+
+            <div class="board-actions">
+              <button id="finish-chain" class="primary-button compact" type="button" disabled>
+                完成連線
+              </button>
+              <button id="cancel-chain" class="secondary-button compact" type="button" disabled>
+                取消
+              </button>
+              <p id="input-hint" class="input-hint">
+                滑鼠／觸控：按住拖曳 · 鍵盤：空白選取、Enter 完成
+              </p>
+            </div>
+          </div>
+
+          <aside class="side-panel echo-panel" aria-labelledby="echo-title">
+            <div>
+              <p class="eyebrow">多出的工作不浪費</p>
+              <h2 id="echo-title">回響庫存</h2>
+            </div>
+            <div id="echo-list" class="echo-list"></div>
+            <dl class="micro-stats">
+              <div><dt>最高連線</dt><dd id="longest-value">0</dd></div>
+              <div><dt>淨化混沌</dt><dd id="purified-value">0</dd></div>
+              <div><dt>分數</dt><dd id="score-value">0</dd></div>
+            </dl>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <div id="briefing-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="briefing-title">
+      <section class="modal-card briefing-card">
+        <p class="eyebrow">第一個可玩班次</p>
+        <h2 id="briefing-title">讓工作盤真的推動診所</h2>
+        <p class="modal-lead">
+          上方每位來訪者都會產生一項工作。從下方盤面連起相同符號，工作就會立刻送回對應診療站。
+        </p>
+
+        <ol class="tutorial-steps">
+          <li><span>1</span><div><strong>看需求</strong><small>留意病患的下一步與耐心。</small></div></li>
+          <li><span>2</span><div><strong>連三顆</strong><small>八方向相鄰都能連，退回上一顆可撤銷。</small></div></li>
+          <li><span>3</span><div><strong>追長鏈</strong><small>5、7、10、13 顆會生成不同特殊珠。</small></div></li>
+        </ol>
+
+        <fieldset class="difficulty-picker">
+          <legend>選擇班次節奏</legend>
+          <label>
+            <input type="radio" name="difficulty" value="comfort" />
+            <span><strong>舒適</strong><small>耐心消耗 70%，安定歸零也能繼續</small></span>
+          </label>
+          <label>
+            <input type="radio" name="difficulty" value="standard" checked />
+            <span><strong>標準</strong><small>推薦的經營與連線平衡</small></span>
+          </label>
+          <label>
+            <input type="radio" name="difficulty" value="focus" />
+            <span><strong>專注</strong><small>耐心消耗 115%，需求更快轉急</small></span>
+          </label>
+        </fieldset>
+
+        <div class="modal-actions">
+          <button id="start-button" class="primary-button" type="button">開始 3 分鐘班次</button>
+          <p>目標：照顧完成 5 位來訪者</p>
+        </div>
+      </section>
+    </div>
+
+    <div id="help-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+      <section class="modal-card help-card">
+        <button class="modal-close" id="close-help" type="button" aria-label="關閉玩法說明">×</button>
+        <p class="eyebrow">操作手冊</p>
+        <h2 id="help-title">四種工作，四種清楚形狀</h2>
+        <div id="help-task-list" class="help-task-list"></div>
+        <h3>特殊珠</h3>
+        <ul class="special-list">
+          <li><strong>5–6 · 脈衝珠</strong><span>下次連到它會清除整列或整行。</span></li>
+          <li><strong>7–9 · 共鳴珠</strong><span>下次連到它會讓主工作量加倍。</span></li>
+          <li><strong>10–12 · 星核</strong><span>清除周圍，並凍結耐心 1.5 秒。</span></li>
+          <li><strong>13+ · 完美星核</strong><span>直接完成目前所有同類工作。</span></li>
+        </ul>
+        <p class="help-tip">混沌珠不能連；清掉旁邊任何任務珠即可淨化。</p>
+        <button id="resume-from-help" class="primary-button" type="button">知道了</button>
+      </section>
+    </div>
+
+    <div id="pause-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
+      <section class="modal-card small-modal">
+        <p class="eyebrow">先喘口氣</p>
+        <h2 id="pause-title">班次已暫停</h2>
+        <p>計時、病患耐心與工作急迫度都已停住。</p>
+        <button id="resume-button" class="primary-button" type="button">繼續值班</button>
+        <button id="restart-button" class="secondary-button" type="button">重新開始這班</button>
+      </section>
+    </div>
+
+    <div id="result-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
+      <section class="modal-card result-card">
+        <p class="eyebrow">班次結算</p>
+        <div id="result-stars" class="result-stars" aria-label="本次星級">☆ ☆ ☆</div>
+        <h2 id="result-title">今天的燈還亮著</h2>
+        <p id="result-praise" class="modal-lead"></p>
+        <div class="result-grid">
+          <div><span>完成照顧</span><strong id="result-served">0</strong></div>
+          <div><span>最高連線</span><strong id="result-longest">0</strong></div>
+          <div><span>最終安定</span><strong id="result-stability">0</strong></div>
+          <div><span>總分</span><strong id="result-score">0</strong></div>
+        </div>
+        <p id="result-tip" class="result-tip"></p>
+        <div class="modal-actions horizontal">
+          <button id="retry-button" class="primary-button" type="button">同一盤勢再試</button>
+          <button id="new-seed-button" class="secondary-button" type="button">換一個班次</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
