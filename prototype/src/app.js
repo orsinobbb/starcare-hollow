@@ -14,6 +14,7 @@ import {
   jobUrgency,
   resolveMove
 } from "./engine.js";
+import { createTownController } from "./town.js";
 import { APP_VERSION } from "./version.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -141,6 +142,8 @@ let lastFrameTime = 0;
 let lastHudRender = 0;
 let toastTimeout = null;
 let helpReturnStatus = "briefing";
+let currentShiftId = null;
+let townController = null;
 
 const elements = {
   board: $("#task-board"),
@@ -172,7 +175,14 @@ const elements = {
   pauseButton: $("#pause-button"),
   toggleInput: $("#toggle-input"),
   toggleSound: $("#toggle-sound"),
-  toast: $("#toast")
+  toast: $("#toast"),
+  townView: $("#town-view"),
+  clinicView: $("#clinic-view"),
+  townHud: $("#town-hud"),
+  shiftHud: $("#shift-hud"),
+  clinicControls: $("#clinic-controls"),
+  townTab: $("#town-tab"),
+  clinicTab: $("#clinic-tab")
 };
 
 function createInitialState(status = "briefing") {
@@ -244,6 +254,62 @@ function showToast(message, duration = 2400) {
   toastTimeout = window.setTimeout(() => {
     elements.toast.hidden = true;
   }, duration);
+}
+
+function setActiveView(view) {
+  const townActive = view === "town";
+  elements.townView.hidden = !townActive;
+  elements.clinicView.hidden = townActive;
+  elements.townHud.hidden = !townActive;
+  elements.shiftHud.hidden = townActive;
+  elements.clinicControls.hidden = townActive;
+  elements.townTab.toggleAttribute("aria-current", townActive);
+  elements.clinicTab.toggleAttribute("aria-current", !townActive);
+  if (townActive) elements.townTab.setAttribute("aria-current", "page");
+  else elements.clinicTab.setAttribute("aria-current", "page");
+  document.body.dataset.view = view;
+}
+
+function showTownView() {
+  if (state.status === "running") {
+    showToast("值班進行中；請先暫停並選擇返回小鎮。", 2200);
+    return false;
+  }
+  elements.briefingModal.hidden = true;
+  elements.helpModal.hidden = true;
+  elements.pauseModal.hidden = true;
+  elements.resultModal.hidden = true;
+  setActiveView("town");
+  townController?.render();
+  window.scrollTo({ top: 0, behavior: "auto" });
+  return true;
+}
+
+function showClinicView() {
+  setActiveView("clinic");
+  elements.briefingModal.hidden = state.status !== "briefing";
+  elements.pauseModal.hidden = state.status !== "paused";
+  elements.resultModal.hidden = state.status !== "result";
+  window.scrollTo({ top: 0, behavior: "auto" });
+  if (state.status === "briefing") $("#start-button").focus();
+  return true;
+}
+
+function resetClinicToBriefing() {
+  clearPointerDrag();
+  state = createInitialState("briefing");
+  selection = [];
+  currentShiftId = null;
+  elements.pauseButton.disabled = true;
+  elements.pauseButton.textContent = "Ⅱ";
+  elements.pauseButton.setAttribute("aria-label", "暫停");
+  renderAll();
+}
+
+function leaveShiftForTown() {
+  resetClinicToBriefing();
+  showTownView();
+  showToast("已返回小鎮；未完成的班次不會消耗任何資源。", 2400);
 }
 
 function playTone(frequency, duration = 0.08, volume = 0.035, wave = "sine") {
@@ -480,6 +546,7 @@ function frame(timestamp) {
 
 function startGame({ keepDifficulty = false } = {}) {
   clearPointerDrag();
+  currentShiftId = globalThis.crypto?.randomUUID?.() ?? `shift-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
   const selectedDifficulty = keepDifficulty
     ? state.difficulty
     : document.querySelector('input[name="difficulty"]:checked')?.value ?? "standard";
@@ -559,6 +626,12 @@ function endShift(reason) {
       : state.served >= shiftGoal
         ? 2
         : 1;
+  const townReward = townController?.recordShift({
+    id: currentShiftId,
+    served: state.served,
+    stars,
+    score: state.score
+  });
   $("#result-stars").textContent = `${"★ ".repeat(stars)}${"☆ ".repeat(3 - stars)}`.trim();
   $("#result-stars").setAttribute("aria-label", `本次獲得 ${stars} 星`);
   $("#result-title").textContent = reason === "stability"
@@ -582,6 +655,7 @@ function endShift(reason) {
   if (state.longest < 5) tip = "試著繞出 5 連；留下的脈衝珠能幫忙處理下一波。";
   else if (state.served >= shiftGoal) tip = "目標完成。下一步可以挑戰 7 連共鳴珠，累積更多回響。";
   $("#result-tip").textContent = tip;
+  $("#result-town-reward").textContent = townReward?.message ?? "班次成果將在返回小鎮後保存。";
 
   elements.resultModal.hidden = false;
   $("#retry-button").focus();
@@ -1038,13 +1112,17 @@ elements.board.addEventListener("keydown", (event) => {
 
 elements.finishChain.addEventListener("click", resolveSelection);
 elements.cancelChain.addEventListener("click", () => cancelSelection());
+elements.townTab.addEventListener("click", showTownView);
+elements.clinicTab.addEventListener("click", showClinicView);
 $("#start-button").addEventListener("click", () => startGame());
+$("#briefing-return-town").addEventListener("click", showTownView);
 elements.pauseButton.addEventListener("click", () => {
   if (state.status === "running") pauseGame();
   else if (state.status === "paused") resumeGame();
 });
 $("#resume-button").addEventListener("click", resumeGame);
 $("#restart-button").addEventListener("click", () => startGame({ keepDifficulty: true }));
+$("#leave-shift-button").addEventListener("click", leaveShiftForTown);
 $("#help-button").addEventListener("click", openHelp);
 $("#close-help").addEventListener("click", closeHelp);
 $("#resume-from-help").addEventListener("click", closeHelp);
@@ -1064,6 +1142,11 @@ elements.toggleSound.addEventListener("click", () => {
   if (soundEnabled) playTone(520, 0.1, 0.035, "triangle");
 });
 $("#retry-button").addEventListener("click", () => startGame({ keepDifficulty: true }));
+$("#return-town-button").addEventListener("click", () => {
+  resetClinicToBriefing();
+  showTownView();
+  showToast("班次成果已保存，小鎮也向前一步。", 2200);
+});
 $("#new-seed-button").addEventListener("click", () => {
   const random = new Uint32Array(1);
   crypto.getRandomValues(random);
@@ -1083,9 +1166,17 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden && state.status === "running") pauseGame();
 });
 
+townController = createTownController({
+  root: document,
+  storage: window.localStorage,
+  onEnterClinic: showClinicView,
+  onNotify: showToast
+});
+
 if (params.get("debug") === "1") {
   window.__STARCARE_DEBUG__ = {
     snapshot: () => structuredClone({ ...state, board: state.board.map((cell) => ({ ...cell })) }),
+    townSnapshot: () => townController.snapshot(),
     legalPath: () => findLegalPath(state.board),
     playLegalMove: () => {
       const path = findLegalPath(state.board);
@@ -1100,7 +1191,10 @@ if (params.get("debug") === "1") {
 
 buildStaticHelp();
 document.documentElement.dataset.appVersion = APP_VERSION;
-$("#version-label").textContent = `GRAYBOX v${APP_VERSION}`;
+$("#version-label").textContent = `CORE v${APP_VERSION}`;
 renderAll();
+if (params.get("view") === "clinic") showClinicView();
+else showTownView();
 window.requestAnimationFrame(frame);
-$("#start-button").focus();
+if (params.get("view") === "clinic") $("#start-button").focus();
+else $("#enter-clinic").focus();

@@ -1,6 +1,6 @@
 {
   "name": "starcare-hollow-graybox",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "《星癒小鎮》可玩灰盒原型",
@@ -12,6 +12,6 @@
     "start": "node server.mjs",
     "start:pages": "node server.mjs --base=/starcare-hollow/",
     "test": "node --test",
-    "check": "node --check src/app.js && node --check src/engine.js && node --check src/version.js && node --check server.mjs && node --test"
+    "check": "node --check src/app.js && node --check src/engine.js && node --check src/town.js && node --check src/version.js && node --check server.mjs && node --test"
   }
 }
