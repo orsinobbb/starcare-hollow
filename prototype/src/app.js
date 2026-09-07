@@ -144,11 +144,14 @@ let toastTimeout = null;
 let helpReturnStatus = "briefing";
 let currentShiftId = null;
 let townController = null;
+let boardResolving = false;
+let boardResolutionToken = 0;
 
 const elements = {
   board: $("#task-board"),
   boardWrap: $("#board-wrap"),
   pathLayer: $("#path-layer"),
+  boardFeedback: $("#board-feedback"),
   finishChain: $("#finish-chain"),
   cancelChain: $("#cancel-chain"),
   chainSummary: $("#chain-summary"),
@@ -296,6 +299,7 @@ function showClinicView() {
 }
 
 function resetClinicToBriefing() {
+  cancelBoardResolution();
   clearPointerDrag();
   state = createInitialState("briefing");
   selection = [];
@@ -509,7 +513,7 @@ function updateJobsAndPatients(delta) {
     if (patient.patience <= 0) departPatient(patient);
   }
 
-  if (boardChanged) renderBoard();
+  if (boardChanged && !boardResolving) renderBoard();
 }
 
 function tick(delta) {
@@ -545,6 +549,7 @@ function frame(timestamp) {
 }
 
 function startGame({ keepDifficulty = false } = {}) {
+  cancelBoardResolution();
   clearPointerDrag();
   currentShiftId = globalThis.crypto?.randomUUID?.() ?? `shift-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
   const selectedDifficulty = keepDifficulty
@@ -569,6 +574,7 @@ function startGame({ keepDifficulty = false } = {}) {
 
 function pauseGame() {
   if (state.status !== "running") return;
+  cancelBoardResolution({ render: true });
   state.status = "paused";
   clearPointerDrag();
   cancelSelection(false);
@@ -592,6 +598,7 @@ function resumeGame() {
 
 function openHelp() {
   if (!elements.helpModal.hidden) return;
+  cancelBoardResolution({ render: true });
   helpReturnStatus = state.status;
   if (state.status === "running") state.status = "help";
   clearPointerDrag();
@@ -612,6 +619,7 @@ function closeHelp() {
 
 function endShift(reason) {
   if (state.status === "result") return;
+  cancelBoardResolution();
   state.status = "result";
   state.endedBy = reason;
   clearPointerDrag();
@@ -812,20 +820,34 @@ function orbLabel(cell, index) {
   return `第 ${point.row + 1} 列第 ${point.column + 1} 欄，${task.label}${special}`;
 }
 
-function renderBoard() {
+function renderBoard({ previousBoard = null, createdAt = -1 } = {}) {
   const hadBoardFocus = elements.board.contains(document.activeElement);
+  const previousPositions = new Map(previousBoard?.map((cell, index) => [cell.id, index]) ?? []);
   elements.board.replaceChildren();
   state.board.forEach((cell, index) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = cell.chaos ? "orb is-chaos" : `orb type-${cell.type}`;
     button.dataset.index = String(index);
+    button.dataset.cellId = cell.id;
     button.setAttribute("role", "gridcell");
     button.setAttribute("aria-rowindex", String(Math.floor(index / BOARD_COLUMNS) + 1));
     button.setAttribute("aria-colindex", String((index % BOARD_COLUMNS) + 1));
     button.setAttribute("aria-label", orbLabel(cell, index));
     button.tabIndex = index === focusedIndex ? 0 : -1;
-    button.disabled = state.status !== "running";
+    button.disabled = state.status !== "running" || boardResolving;
+
+    if (previousBoard) {
+      const previousIndex = previousPositions.get(cell.id);
+      const currentRow = Math.floor(index / BOARD_COLUMNS);
+      const previousRow = previousIndex === undefined ? -1 : Math.floor(previousIndex / BOARD_COLUMNS);
+      const dropRows = previousIndex === undefined ? currentRow + 1 : currentRow - previousRow;
+      if (previousIndex === undefined) button.classList.add("is-refilling");
+      else if (dropRows > 0) button.classList.add("is-dropping");
+      if (dropRows > 0) button.style.setProperty("--drop-distance", `${dropRows * -118}%`);
+      button.style.setProperty("--drop-delay", `${(index % BOARD_COLUMNS) * 14}ms`);
+    }
+    if (index === createdAt) button.classList.add("is-created-special");
 
     const symbol = document.createElement("span");
     symbol.className = "orb-symbol";
@@ -893,8 +915,8 @@ function updateSelectionVisuals() {
     elements.chainSummary.textContent = `${task.label} +${length}`;
     elements.chainPreview.textContent = special ? `將生成：${special.label}` : "有效連線 · 5 顆生成脈衝珠";
   }
-  elements.finishChain.disabled = state.status !== "running" || length < 3;
-  elements.cancelChain.disabled = !length;
+  elements.finishChain.disabled = state.status !== "running" || boardResolving || length < 3;
+  elements.cancelChain.disabled = boardResolving || !length;
   window.requestAnimationFrame(renderPath);
 }
 
@@ -905,7 +927,7 @@ function renderAll() {
 }
 
 function selectCell(index) {
-  if (state.status !== "running") return false;
+  if (state.status !== "running" || boardResolving) return false;
   const cell = state.board[index];
   if (!cell || cell.chaos) {
     announce("混沌珠不能直接連線；清除它旁邊的任務珠。 ");
@@ -938,8 +960,41 @@ function cancelSelection(withMessage = true) {
   updateSelectionVisuals();
 }
 
-function resolveSelection() {
-  if (state.status !== "running") return false;
+function prefersReducedMotion() {
+  return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+function waitForBoardMotion(duration) {
+  return new Promise((resolve) => window.setTimeout(resolve, prefersReducedMotion() ? 0 : duration));
+}
+
+function cancelBoardResolution({ render = false } = {}) {
+  const wasResolving = boardResolving;
+  boardResolutionToken += 1;
+  boardResolving = false;
+  elements.board.classList.remove("is-resolving");
+  elements.boardFeedback?.classList.remove("is-visible");
+  if (render && wasResolving) renderBoard();
+}
+
+function showBoardResolution(result, path) {
+  elements.board.classList.add("is-resolving");
+  for (const index of result.removedIndices) {
+    elements.board.querySelector(`[data-index="${index}"]`)?.classList.add("is-clearing");
+  }
+  if (result.createdSpecial) {
+    elements.board.querySelector(`[data-index="${path[0]}"]`)?.classList.add("is-transforming");
+  }
+  if (elements.boardFeedback) {
+    elements.boardFeedback.textContent = `消除 ${result.clearedCount}`;
+    elements.boardFeedback.classList.remove("is-visible");
+    void elements.boardFeedback.offsetWidth;
+    elements.boardFeedback.classList.add("is-visible");
+  }
+}
+
+async function resolveSelection() {
+  if (state.status !== "running" || boardResolving) return false;
   if (selection.length < 3) {
     announce("至少需要三顆相同任務珠。 ");
     cancelSelection(false);
@@ -947,6 +1002,7 @@ function resolveSelection() {
   }
 
   const path = [...selection];
+  const previousBoard = state.board.map((cell) => ({ ...cell }));
   const result = resolveMove(state.board, path, { rng, weights: demandWeights() });
   if (!result.valid) {
     announce(result.reason);
@@ -954,6 +1010,9 @@ function resolveSelection() {
     return false;
   }
 
+  boardResolving = true;
+  const resolutionToken = ++boardResolutionToken;
+  showBoardResolution(result, path);
   state.board = result.board;
   state.moves += 1;
   state.longest = Math.max(state.longest, result.chainLength);
@@ -987,7 +1046,20 @@ function resolveSelection() {
 
   selection = [];
   playResolveSound(result.chainLength);
-  renderAll();
+  renderDynamic();
+
+  await waitForBoardMotion(260);
+  if (resolutionToken !== boardResolutionToken) return true;
+  renderBoard({ previousBoard, createdAt: result.createdAt });
+  renderDynamic();
+
+  await waitForBoardMotion(390);
+  if (resolutionToken !== boardResolutionToken) return true;
+  boardResolving = false;
+  elements.board.classList.remove("is-resolving");
+  elements.boardFeedback?.classList.remove("is-visible");
+  renderBoard();
+  renderDynamic();
   return true;
 }
 
@@ -1021,7 +1093,7 @@ function clearPointerDrag() {
 }
 
 function onPointerDown(event) {
-  if (tapMode || state.status !== "running" || event.button > 0) return;
+  if (tapMode || state.status !== "running" || boardResolving || event.button > 0) return;
   const orb = event.target.closest(".orb");
   if (!orb || orb.disabled) return;
   event.preventDefault();
@@ -1089,11 +1161,12 @@ elements.board.addEventListener("focusin", (event) => {
   if (orb) focusedIndex = Number(orb.dataset.index);
 });
 elements.board.addEventListener("click", (event) => {
-  if (!tapMode || state.status !== "running") return;
+  if (!tapMode || state.status !== "running" || boardResolving) return;
   const orb = event.target.closest(".orb");
   if (orb && !orb.disabled) selectCell(Number(orb.dataset.index));
 });
 elements.board.addEventListener("keydown", (event) => {
+  if (boardResolving) return;
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
     event.preventDefault();
     moveFocus(event.key);

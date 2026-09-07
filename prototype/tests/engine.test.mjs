@@ -58,6 +58,7 @@ test("five-chain produces a pulse orb and preserves board size", () => {
   assert.equal(result.valid, true);
   assert.equal(result.createdSpecial.kind, "pulse");
   assert.equal(result.workByType.care, 5);
+  assert.deepEqual(result.removedIndices, [1, 2, 3, 4]);
   assert.equal(result.board.length, 42);
   assert.equal(result.board.filter((cell) => cell.special === "pulse").length, 1);
 });

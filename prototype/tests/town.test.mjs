@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  COLLECTION_ITEMS,
   TOWN_BACKUP_KEY,
   TOWN_SAVE_KEY,
+  TOWN_SCHEMA_VERSION,
   advanceTownDay,
   claimDailyReward,
   createTownState,
@@ -20,6 +22,30 @@ test("a new town starts with one coherent shared inventory", () => {
   assert.equal(state.day, 1);
   assert.deepEqual(state.resources, { coins: 90, moonleaf: 1, timber: 2, starlight: 0 });
   assert.deepEqual(state.buildings, { clinic: 1, garden: 1, workshop: 1 });
+  assert.deepEqual(state.collections.unlocked, ["founders-mark"]);
+});
+
+test("town actions unlock permanent collectibles rather than only currencies", () => {
+  let state = createTownState();
+  const harvest = tendGarden(state);
+  assert.deepEqual(harvest.delta.collectionIds, ["moonleaf-pressing"]);
+  state = harvest.state;
+
+  const commission = fulfillCommission(state);
+  assert.deepEqual(commission.delta.collectionIds, ["tobis-whistle"]);
+  state = commission.state;
+
+  const shift = recordClinicShift(state, { id: "collection-shift", served: 1, stars: 1 });
+  assert.deepEqual(shift.delta.collectionIds, ["clinic-badge"]);
+  state = shift.state;
+
+  const upgrade = upgradeBuilding(state, "garden");
+  assert.deepEqual(upgrade.delta.collectionIds, ["restorer-pin"]);
+  state = upgrade.state;
+
+  const reward = claimDailyReward(state);
+  assert.deepEqual(reward.delta.collectionIds, ["three-wish-medal", "lantern-keepsake"]);
+  assert.equal(reward.state.collections.unlocked.length, COLLECTION_ITEMS.length);
 });
 
 test("the garden can be harvested only once each town day", () => {
@@ -94,4 +120,25 @@ test("town saves round-trip and malformed saves fall back safely", () => {
   assert.deepEqual(loadTownState(storage), createTownState());
   assert.equal(saveTownState(createTownState(), storage), true);
   assert.equal(memory.get(TOWN_BACKUP_KEY), "{broken", "the unreadable payload is preserved before replacement");
+});
+
+test("schema v1 saves migrate without losing progress and infer collectibles", () => {
+  const legacy = createTownState();
+  legacy.schemaVersion = 1;
+  legacy.restoration = 12;
+  legacy.lifetime.harvests = 3;
+  legacy.lifetime.shifts = 2;
+  delete legacy.lifetime.dailyRewards;
+  delete legacy.collections;
+
+  const payload = JSON.stringify({ schemaVersion: 1, gameVersion: "0.2.0", profile: legacy });
+  const storage = { getItem: () => payload, setItem: () => {} };
+  const migrated = loadTownState(storage);
+
+  assert.equal(migrated.schemaVersion, TOWN_SCHEMA_VERSION);
+  assert.equal(migrated.restoration, 12);
+  assert.equal(migrated.lifetime.dailyRewards, 0);
+  assert.ok(migrated.collections.unlocked.includes("moonleaf-pressing"));
+  assert.ok(migrated.collections.unlocked.includes("clinic-badge"));
+  assert.ok(migrated.collections.unlocked.includes("lantern-keepsake"));
 });

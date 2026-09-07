@@ -2,7 +2,7 @@
 
 [![Quality and deploy GitHub Pages](https://github.com/orsinobbb/starcare-hollow/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/orsinobbb/starcare-hollow/actions/workflows/deploy-pages.yml)
 
-這個資料夾包含完整遊戲設計、美術生成提示，以及一個具小鎮累積、建築升級與療癒所班次的瀏覽器原型。
+這個資料夾包含完整遊戲設計、美術生成提示，以及一個具小鎮累積、永久收藏、建築升級與療癒所班次的瀏覽器原型。
 
 公開遊玩網址：<https://orsinobbb.github.io/starcare-hollow/>
 
@@ -17,7 +17,7 @@ npm start
 
 ## 從這裡開始
 
-1. 先從 [小鎮核心原型](prototype/README.md) 完成藥園、委託與診療星願，確認跨系統累積感。
+1. 先從 [小鎮核心原型](prototype/README.md) 完成藥園、委託與診療星願，收錄星願手札並確認跨系統累積感。
 2. 閱讀 [設計總覽](docs/00_PROJECT_OVERVIEW.md) 與 [核心玩法](docs/01_CORE_GAMEPLAY.md)。
 3. 把 [美術需求](docs/06_ART_DIRECTION_AI_ASSET_BRIEFS.md) 的 A01～A08 提示交給繪圖 AI。
 4. 將原尺寸 PNG 放回專案，再進行風格、可讀性與製作可行性審查。

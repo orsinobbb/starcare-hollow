@@ -9,7 +9,7 @@
       content="《星癒小鎮》小鎮經營、建築升級與療癒所連線玩法的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.2.0" />
+    <link rel="stylesheet" href="./styles.css?v=0.3.0" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.2.0</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.3.0</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -199,6 +199,18 @@
               <button id="next-town-day" class="secondary-button" type="button" disabled>進入下一日</button>
             </aside>
           </div>
+
+          <section class="collection-journal" aria-labelledby="collection-title">
+            <div class="collection-heading">
+              <div>
+                <p class="eyebrow">永久收藏</p>
+                <h2 id="collection-title">星願手札</h2>
+              </div>
+              <strong id="town-collection-count">1 / 7</strong>
+            </div>
+            <p>資源會被使用，手札不會。採收、委託、值班、升級與修復都會留下獨一份紀念。</p>
+            <div id="town-collection-grid" class="collection-grid" aria-live="polite"></div>
+          </section>
         </section>
 
         <div id="clinic-view" hidden>
@@ -253,6 +265,7 @@
 
             <div id="board-wrap" class="board-wrap">
               <svg id="path-layer" class="path-layer" aria-hidden="true"></svg>
+              <div id="board-feedback" class="board-resolve-feedback" aria-hidden="true"></div>
               <div
                 id="task-board"
                 class="task-board"
@@ -386,6 +399,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.2.0"></script>
+    <script type="module" src="./src/app.js?v=0.3.0"></script>
   </body>
 </html>

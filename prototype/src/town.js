@@ -49,6 +49,67 @@ export const DAILY_WISHES = [
   { id: "clinic", title: "守住療癒所", detail: "完成一個診療班次" }
 ];
 
+export const COLLECTION_ITEMS = Object.freeze([
+  {
+    id: "founders-mark",
+    icon: "✦",
+    category: "鎮史",
+    name: "初亮鎮印",
+    detail: "你在暖燈坡點亮的第一枚印記。",
+    hint: "建立小鎮存檔"
+  },
+  {
+    id: "moonleaf-pressing",
+    icon: "❧",
+    category: "植物標本",
+    name: "月芽壓花",
+    detail: "第一批親手照料的月芽，葉脈仍留著晨光。",
+    hint: "完成第一次藥園採收"
+  },
+  {
+    id: "tobis-whistle",
+    icon: "♫",
+    category: "居民信物",
+    name: "托比的暖木哨",
+    detail: "托比為答謝材料而削成的小哨，聲音像回家的風。",
+    hint: "完成第一次居民委託"
+  },
+  {
+    id: "clinic-badge",
+    icon: "✚",
+    category: "療癒紀錄",
+    name: "暖星值班章",
+    detail: "不論成績高低，這枚章記得你守過的一次班。",
+    hint: "完成第一次療癒所值班"
+  },
+  {
+    id: "restorer-pin",
+    icon: "⚒",
+    category: "城鎮徽記",
+    name: "修繕者銅章",
+    detail: "第一座升級設施留下的銅章，證明小鎮真的在成長。",
+    hint: "完成第一次建築升級"
+  },
+  {
+    id: "three-wish-medal",
+    icon: "★",
+    category: "星願紀念",
+    name: "三願星章",
+    detail: "採集、委託與照顧交會成的一日完整記憶。",
+    hint: "第一次集齊三項今日星願"
+  },
+  {
+    id: "lantern-keepsake",
+    icon: "☼",
+    category: "鎮景收藏",
+    name: "重燃街燈",
+    detail: "暖燈坡重新亮起的街燈縮影，見證第一段復甦。",
+    hint: "讓暖燈坡修復度達到 10"
+  }
+]);
+
+const COLLECTION_BY_ID = Object.fromEntries(COLLECTION_ITEMS.map((item) => [item.id, item]));
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -85,12 +146,16 @@ export function createTownState() {
       workshop: 1
     },
     daily: createDaily(1),
+    collections: {
+      unlocked: ["founders-mark"]
+    },
     lifetime: {
       shifts: 0,
       served: 0,
       harvests: 0,
       commissions: 0,
-      upgrades: 0
+      upgrades: 0,
+      dailyRewards: 0
     },
     history: {
       rewardedShiftIds: []
@@ -101,7 +166,7 @@ export function createTownState() {
 
 export function normalizeTownState(raw) {
   const fallback = createTownState();
-  if (!raw || typeof raw !== "object" || raw.schemaVersion !== TOWN_SCHEMA_VERSION) return fallback;
+  if (!raw || typeof raw !== "object" || ![1, TOWN_SCHEMA_VERSION].includes(raw.schemaVersion)) return fallback;
 
   const day = integer(raw.day, 1, 1);
   const state = {
@@ -126,6 +191,11 @@ export function normalizeTownState(raw) {
           rewardClaimed: Boolean(raw.daily.rewardClaimed)
         }
       : createDaily(day),
+    collections: {
+      unlocked: Array.isArray(raw.collections?.unlocked)
+        ? raw.collections.unlocked.filter((id) => COLLECTION_BY_ID[id])
+        : []
+    },
     lifetime: Object.fromEntries(
       Object.keys(fallback.lifetime).map((key) => [key, integer(raw.lifetime?.[key])])
     ),
@@ -137,7 +207,7 @@ export function normalizeTownState(raw) {
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : null
   };
 
-  return state;
+  return syncCollectionProgress(state);
 }
 
 export function loadTownState(storage = globalThis.localStorage) {
@@ -145,10 +215,10 @@ export function loadTownState(storage = globalThis.localStorage) {
     const serialized = storage?.getItem(TOWN_SAVE_KEY);
     if (!serialized) return createTownState();
     const parsed = JSON.parse(serialized);
-    if (parsed?.profile && parsed.schemaVersion === TOWN_SCHEMA_VERSION) {
+    if (parsed?.profile && typeof parsed.profile === "object") {
       return normalizeTownState({
         ...parsed.profile,
-        schemaVersion: parsed.schemaVersion,
+        schemaVersion: parsed.schemaVersion ?? parsed.profile.schemaVersion,
         updatedAt: parsed.savedAt ?? parsed.profile.updatedAt
       });
     }
@@ -193,6 +263,43 @@ function outcome(state, ok, message, delta = {}) {
   return { state, ok, message, delta };
 }
 
+export function collectionRequirementsMet(state, itemId) {
+  if (itemId === "founders-mark") return true;
+  if (itemId === "moonleaf-pressing") return state.lifetime.harvests >= 1;
+  if (itemId === "tobis-whistle") return state.lifetime.commissions >= 1;
+  if (itemId === "clinic-badge") return state.lifetime.shifts >= 1;
+  if (itemId === "restorer-pin") return state.lifetime.upgrades >= 1;
+  if (itemId === "three-wish-medal") return state.lifetime.dailyRewards >= 1;
+  if (itemId === "lantern-keepsake") return state.restoration >= 10;
+  return false;
+}
+
+export function syncCollectionProgress(state) {
+  const unlocked = new Set(
+    Array.isArray(state.collections?.unlocked)
+      ? state.collections.unlocked.filter((id) => COLLECTION_BY_ID[id])
+      : []
+  );
+  for (const item of COLLECTION_ITEMS) {
+    if (collectionRequirementsMet(state, item.id)) unlocked.add(item.id);
+  }
+  state.collections = {
+    unlocked: COLLECTION_ITEMS.filter((item) => unlocked.has(item.id)).map((item) => item.id)
+  };
+  return state;
+}
+
+function collectionOutcome(previous, next, message, delta = {}) {
+  const previousIds = new Set(previous.collections?.unlocked ?? []);
+  syncCollectionProgress(next);
+  const collectionIds = next.collections.unlocked.filter((id) => !previousIds.has(id));
+  return outcome(next, true, message, {
+    ...delta,
+    collections: collectionIds.length,
+    collectionIds
+  });
+}
+
 export function tendGarden(state) {
   if (state.daily.garden) return outcome(state, false, "今天的月芽已經照料完成，明日還會再長。");
   const next = clone(state);
@@ -201,7 +308,7 @@ export function tendGarden(state) {
   next.restoration += 1;
   next.daily.garden = true;
   next.lifetime.harvests += 1;
-  return outcome(next, true, `採收到 ${amount} 片月芽葉，小鎮修復度也增加了。`, {
+  return collectionOutcome(state, next, `採收到 ${amount} 片月芽葉，小鎮修復度也增加了。`, {
     moonleaf: amount,
     restoration: 1
   });
@@ -220,7 +327,7 @@ export function fulfillCommission(state) {
   next.restoration += 2;
   next.daily.commission = true;
   next.lifetime.commissions += 1;
-  return outcome(next, true, `托比收到材料了：獲得 ${coins} 星幣與 1 份暖木。`, {
+  return collectionOutcome(state, next, `托比收到材料了：獲得 ${coins} 星幣與 1 份暖木。`, {
     coins,
     moonleaf: -cost.moonleaf,
     timber: 1,
@@ -253,7 +360,7 @@ export function recordClinicShift(state, { id, served = 0, stars = 0, score = 0 
   next.history.rewardedShiftIds.push(shiftId);
   next.history.rewardedShiftIds = next.history.rewardedShiftIds.slice(-40);
 
-  return outcome(next, true, `值班成果已帶回小鎮：星幣 +${coins}${starlight ? `、星砂 +${starlight}` : ""}。`, {
+  return collectionOutcome(state, next, `值班成果已帶回小鎮：星幣 +${coins}${starlight ? `、星砂 +${starlight}` : ""}。`, {
     coins,
     starlight,
     restoration,
@@ -273,7 +380,8 @@ export function claimDailyReward(state) {
   next.resources.starlight += 1;
   next.restoration += 3;
   next.daily.rewardClaimed = true;
-  return outcome(next, true, "三枚星願章已集齊：獲得 60 星幣、2 份暖木與 1 份星砂。", {
+  next.lifetime.dailyRewards += 1;
+  return collectionOutcome(state, next, "三枚星願章已集齊：獲得 60 星幣、2 份暖木與 1 份星砂。", {
     coins: 60,
     timber: 2,
     starlight: 1,
@@ -304,7 +412,7 @@ export function upgradeBuilding(state, buildingId) {
   next.buildings[buildingId] = nextLevel;
   next.restoration += 2;
   next.lifetime.upgrades += 1;
-  return outcome(next, true, `${building.name}升到 Lv.${nextLevel}，新的效果已永久生效。`, {
+  return collectionOutcome(state, next, `${building.name}升到 Lv.${nextLevel}，新的效果已永久生效。`, {
     restoration: 2,
     buildingId,
     level: nextLevel
@@ -322,6 +430,7 @@ export function townStage(restoration) {
 
 export function createTownController({ root = document, storage = globalThis.localStorage, onEnterClinic, onNotify } = {}) {
   let state = loadTownState(storage);
+  let recentCollectionIds = [];
   const notify = typeof onNotify === "function" ? onNotify : () => {};
   const enterClinic = typeof onEnterClinic === "function" ? onEnterClinic : () => {};
   const element = (selector) => root.querySelector(selector);
@@ -344,6 +453,8 @@ export function createTownController({ root = document, storage = globalThis.loc
     gardenAction: element("#garden-action"),
     commissionAction: element("#commission-action"),
     buildingGrid: element("#town-building-grid"),
+    collectionGrid: element("#town-collection-grid"),
+    collectionCount: element("#town-collection-count"),
     saveStatus: element("#save-status"),
     lifetime: element("#town-lifetime")
   };
@@ -361,9 +472,14 @@ export function createTownController({ root = document, storage = globalThis.loc
       return result;
     }
     state = result.state;
+    recentCollectionIds = result.delta.collectionIds ?? [];
     persist();
     render();
-    notify(result.message);
+    const collectionNames = recentCollectionIds.map((id) => COLLECTION_BY_ID[id]?.name).filter(Boolean);
+    notify(collectionNames.length
+      ? `${result.message} 新收藏「${collectionNames.join("、")}」已收入星願手札。`
+      : result.message);
+    recentCollectionIds = [];
     return result;
   }
 
@@ -404,6 +520,38 @@ export function createTownController({ root = document, storage = globalThis.loc
     if (ui.nextDay) ui.nextDay.disabled = !state.daily.rewardClaimed;
   }
 
+  function renderCollections() {
+    ui.collectionGrid?.replaceChildren();
+    const unlocked = new Set(state.collections.unlocked);
+    for (const item of COLLECTION_ITEMS) {
+      const isUnlocked = unlocked.has(item.id);
+      const card = document.createElement("article");
+      card.className = `collection-card ${isUnlocked ? "is-unlocked" : "is-locked"}`;
+      if (recentCollectionIds.includes(item.id)) card.classList.add("is-new");
+      card.dataset.collectionId = item.id;
+      card.setAttribute("aria-label", isUnlocked ? `已收錄：${item.name}` : `尚未收錄：${item.hint}`);
+
+      const icon = document.createElement("span");
+      icon.className = "collection-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = isUnlocked ? item.icon : "?";
+
+      const copy = document.createElement("div");
+      copy.className = "collection-copy";
+      const category = document.createElement("span");
+      category.className = "collection-category";
+      category.textContent = isUnlocked ? item.category : "尚待發現";
+      const name = document.createElement("strong");
+      name.textContent = isUnlocked ? item.name : "未收錄";
+      const detail = document.createElement("small");
+      detail.textContent = isUnlocked ? item.detail : item.hint;
+      copy.append(category, name, detail);
+      card.append(icon, copy);
+      ui.collectionGrid?.append(card);
+    }
+    if (ui.collectionCount) ui.collectionCount.textContent = `${unlocked.size} / ${COLLECTION_ITEMS.length}`;
+  }
+
   function render() {
     const stage = townStage(state.restoration);
     const restorationPercent = Math.min(100, (state.restoration / DISTRICT_RESTORATION_GOAL) * 100);
@@ -433,6 +581,7 @@ export function createTownController({ root = document, storage = globalThis.loc
     }
     renderBuildings();
     renderWishes();
+    renderCollections();
   }
 
   element("#enter-clinic")?.addEventListener("click", enterClinic);

@@ -46,9 +46,24 @@ test("town shell, controller, and versioned save contract ship together", async 
   assert.match(html, /id="clinic-view"/);
   assert.match(html, /id="town-map"/);
   assert.match(html, /id="town-wish-list"/);
+  assert.match(html, /id="town-collection-grid"/);
   assert.match(app, /createTownController/);
   assert.match(app, /townController\?\.recordShift/);
   assert.match(TOWN_SAVE_KEY, /:v1$/);
+});
+
+test("board resolution ships explicit clear, drop, refill, and count feedback", async () => {
+  const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
+  const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
+  const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
+  const engine = await readFile(new URL("src/engine.js", siteRootUrl), "utf8");
+
+  assert.match(html, /id="board-feedback"/);
+  assert.match(css, /\.orb\.is-clearing/);
+  assert.match(css, /\.orb\.is-dropping/);
+  assert.match(css, /\.orb\.is-refilling/);
+  assert.match(app, /showBoardResolution\(result, path\)/);
+  assert.match(engine, /removedIndices/);
 });
 
 test("touch dragging prevents the task board from scrolling the page", async () => {

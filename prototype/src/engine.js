@@ -309,6 +309,7 @@ export function resolveMove(board, path, {
   return {
     valid: true,
     board: nextBoard,
+    removedIndices: [...removed].sort((a, b) => a - b),
     chainType,
     chainLength: path.length,
     workByType,
