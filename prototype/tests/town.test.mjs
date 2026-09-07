@@ -35,8 +35,8 @@ test("town actions unlock permanent collectibles rather than only currencies", (
   assert.deepEqual(commission.delta.collectionIds, ["tobis-whistle"]);
   state = commission.state;
 
-  const shift = recordClinicShift(state, { id: "collection-shift", served: 1, stars: 1 });
-  assert.deepEqual(shift.delta.collectionIds, ["clinic-badge"]);
+  const shift = recordClinicShift(state, { id: "collection-shift", served: 1, stars: 1, skillUses: 1 });
+  assert.deepEqual(shift.delta.collectionIds, ["clinic-badge", "companion-charm"]);
   state = shift.state;
 
   const upgrade = upgradeBuilding(state, "garden");
@@ -76,6 +76,18 @@ test("a clinic shift rewards the town exactly once", () => {
   assert.equal(first.delta.starlight, 1);
   assert.equal(duplicate.ok, false);
   assert.deepEqual(duplicate.state.resources, first.state.resources);
+});
+
+test("using a companion skill becomes permanent collection progress", () => {
+  const result = recordClinicShift(createTownState(), {
+    id: "skill-shift",
+    served: 1,
+    stars: 1,
+    skillUses: 2
+  });
+  assert.equal(result.state.lifetime.skillUses, 2);
+  assert.ok(result.state.collections.unlocked.includes("companion-charm"));
+  assert.equal(result.delta.skillUses, 2);
 });
 
 test("three daily wishes unlock a reward and the next player-controlled day", () => {
@@ -129,6 +141,7 @@ test("schema v1 saves migrate without losing progress and infer collectibles", (
   legacy.lifetime.harvests = 3;
   legacy.lifetime.shifts = 2;
   delete legacy.lifetime.dailyRewards;
+  delete legacy.lifetime.skillUses;
   delete legacy.collections;
 
   const payload = JSON.stringify({ schemaVersion: 1, gameVersion: "0.2.0", profile: legacy });
@@ -138,6 +151,7 @@ test("schema v1 saves migrate without losing progress and infer collectibles", (
   assert.equal(migrated.schemaVersion, TOWN_SCHEMA_VERSION);
   assert.equal(migrated.restoration, 12);
   assert.equal(migrated.lifetime.dailyRewards, 0);
+  assert.equal(migrated.lifetime.skillUses, 0);
   assert.ok(migrated.collections.unlocked.includes("moonleaf-pressing"));
   assert.ok(migrated.collections.unlocked.includes("clinic-badge"));
   assert.ok(migrated.collections.unlocked.includes("lantern-keepsake"));

@@ -4,11 +4,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { APP_VERSION, SAVE_SCHEMA_VERSION } from "../src/version.js";
-import {
-  TOWN_GAME_VERSION,
-  TOWN_SAVE_KEY,
-  TOWN_SCHEMA_VERSION
-} from "../src/town.js";
+import { TOWN_GAME_VERSION, TOWN_SAVE_KEY, TOWN_SCHEMA_VERSION } from "../src/town.js";
 
 const siteRootUrl = new URL("../", import.meta.url);
 const siteRoot = fileURLToPath(siteRootUrl);
@@ -52,29 +48,26 @@ test("town shell, controller, and versioned save contract ship together", async 
   assert.match(TOWN_SAVE_KEY, /:v1$/);
 });
 
-test("board resolution ships explicit clear, drop, refill, and count feedback", async () => {
+test("clinic ships resident selection, station dispatch, and player-chosen skills", async () => {
   const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
   const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
   const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
-  const engine = await readFile(new URL("src/engine.js", siteRootUrl), "utf8");
 
-  assert.match(html, /id="board-feedback"/);
-  assert.match(css, /\.orb\.is-clearing/);
-  assert.match(css, /\.orb\.is-dropping/);
-  assert.match(css, /\.orb\.is-refilling/);
-  assert.match(app, /showBoardResolution\(result, path\)/);
-  assert.match(engine, /removedIndices/);
+  assert.match(html, /id="patient-list"/);
+  assert.match(html, /id="selected-visit"/);
+  assert.match(html, /id="station-list"/);
+  assert.match(html, /id="skill-list"/);
+  assert.doesNotMatch(html, /id="task-board"/);
+  assert.match(css, /\.care-workspace/);
+  assert.match(css, /\.station-action/);
+  assert.match(css, /\.skill-card\.is-ready/);
+  assert.match(app, /function serviceSelectedPatient/);
+  assert.match(app, /function activateSkill/);
 });
 
-test("touch dragging prevents the task board from scrolling the page", async () => {
-  const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
+test("clinic uses ordinary buttons so the page remains scrollable on touch screens", async () => {
   const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
-
-  assert.match(css, /\.board-wrap\s*\{[^}]*touch-action:\s*none/s);
-  assert.match(css, /html\.is-board-dragging[\s\S]*touch-action:\s*none/);
-  assert.match(app, /touchmove", preventBoardTouchScroll, \{ capture: true, passive: false \}/);
-  assert.match(app, /setBoardDragLock\(true\)/);
-  assert.match(app, /clearPointerDrag\(\)/);
-  assert.match(app, /event\.type === "pointercancel"/);
-  assert.match(app, /window\.addEventListener\("blur", clearPointerDrag\)/);
+  assert.match(app, /data-station-type/);
+  assert.match(app, /data-skill-id/);
+  assert.doesNotMatch(app, /pointerdown|pointermove|touchmove|preventDefault/);
 });

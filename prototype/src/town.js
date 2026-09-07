@@ -83,6 +83,14 @@ export const COLLECTION_ITEMS = Object.freeze([
     hint: "完成第一次療癒所值班"
   },
   {
+    id: "companion-charm",
+    icon: "♡",
+    category: "搭檔信物",
+    name: "三心共鳴徽記",
+    detail: "艾芙、賽恩與絨絨把第一次並肩施放技能的光留在這枚徽記裡。",
+    hint: "在療癒所第一次施放搭檔技能"
+  },
+  {
     id: "restorer-pin",
     icon: "⚒",
     category: "城鎮徽記",
@@ -155,7 +163,8 @@ export function createTownState() {
       harvests: 0,
       commissions: 0,
       upgrades: 0,
-      dailyRewards: 0
+      dailyRewards: 0,
+      skillUses: 0
     },
     history: {
       rewardedShiftIds: []
@@ -166,7 +175,13 @@ export function createTownState() {
 
 export function normalizeTownState(raw) {
   const fallback = createTownState();
-  if (!raw || typeof raw !== "object" || ![1, TOWN_SCHEMA_VERSION].includes(raw.schemaVersion)) return fallback;
+  if (
+    !raw
+    || typeof raw !== "object"
+    || !Number.isInteger(raw.schemaVersion)
+    || raw.schemaVersion < 1
+    || raw.schemaVersion > TOWN_SCHEMA_VERSION
+  ) return fallback;
 
   const day = integer(raw.day, 1, 1);
   const state = {
@@ -268,6 +283,7 @@ export function collectionRequirementsMet(state, itemId) {
   if (itemId === "moonleaf-pressing") return state.lifetime.harvests >= 1;
   if (itemId === "tobis-whistle") return state.lifetime.commissions >= 1;
   if (itemId === "clinic-badge") return state.lifetime.shifts >= 1;
+  if (itemId === "companion-charm") return state.lifetime.skillUses >= 1;
   if (itemId === "restorer-pin") return state.lifetime.upgrades >= 1;
   if (itemId === "three-wish-medal") return state.lifetime.dailyRewards >= 1;
   if (itemId === "lantern-keepsake") return state.restoration >= 10;
@@ -335,7 +351,7 @@ export function fulfillCommission(state) {
   });
 }
 
-export function recordClinicShift(state, { id, served = 0, stars = 0, score = 0 } = {}) {
+export function recordClinicShift(state, { id, served = 0, stars = 0, score = 0, skillUses = 0 } = {}) {
   const shiftId = typeof id === "string" && id ? id : null;
   if (!shiftId) return outcome(state, false, "這次班次缺少識別碼，沒有重複發放獎勵。");
   if (state.history.rewardedShiftIds.includes(shiftId)) {
@@ -346,6 +362,7 @@ export function recordClinicShift(state, { id, served = 0, stars = 0, score = 0 
   const safeServed = integer(served);
   const safeStars = Math.min(3, integer(stars));
   const safeScore = integer(score);
+  const safeSkillUses = integer(skillUses);
   const coins = 12 + safeServed * 6 + safeStars * 7 + Math.max(0, next.buildings.clinic - 1) * 8;
   const starlight = safeStars > 0 ? 1 + Math.floor(safeStars / 3) : 0;
   const firstClinicToday = !next.daily.clinic;
@@ -357,6 +374,7 @@ export function recordClinicShift(state, { id, served = 0, stars = 0, score = 0 
   next.daily.clinic = true;
   next.lifetime.shifts += 1;
   next.lifetime.served += safeServed;
+  next.lifetime.skillUses += safeSkillUses;
   next.history.rewardedShiftIds.push(shiftId);
   next.history.rewardedShiftIds = next.history.rewardedShiftIds.slice(-40);
 
@@ -364,7 +382,8 @@ export function recordClinicShift(state, { id, served = 0, stars = 0, score = 0 
     coins,
     starlight,
     restoration,
-    score: safeScore
+    score: safeScore,
+    skillUses: safeSkillUses
   });
 }
 

@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#18243f" />
     <meta
       name="description"
-      content="《星癒小鎮》小鎮經營、建築升級與療癒所連線玩法的可玩原型"
+      content="《星癒小鎮》小鎮經營、永久收藏與療癒所調度技能玩法的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.3.0" />
+    <link rel="stylesheet" href="./styles.css?v=0.4.0" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.3.0</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.4.0</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -65,9 +65,6 @@
 
         <nav id="clinic-controls" class="header-actions" aria-label="遊戲控制" hidden>
           <button id="help-button" class="icon-button" type="button" aria-label="開啟玩法說明">?</button>
-          <button id="toggle-input" class="control-button" type="button" aria-pressed="false">
-            點選模式：關
-          </button>
           <button id="toggle-sound" class="icon-button" type="button" aria-pressed="true" aria-label="關閉音效">
             ♪
           </button>
@@ -206,7 +203,7 @@
                 <p class="eyebrow">永久收藏</p>
                 <h2 id="collection-title">星願手札</h2>
               </div>
-              <strong id="town-collection-count">1 / 7</strong>
+              <strong id="town-collection-count">1 / 8</strong>
             </div>
             <p>資源會被使用，手札不會。採收、委託、值班、升級與修復都會留下獨一份紀念。</p>
             <div id="town-collection-grid" class="collection-grid" aria-live="polite"></div>
@@ -214,112 +211,97 @@
         </section>
 
         <div id="clinic-view" hidden>
-        <section class="clinic-panel" aria-labelledby="clinic-title">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">照顧現場</p>
-              <h2 id="clinic-title">暖星療癒所</h2>
+          <section class="clinic-panel" aria-labelledby="clinic-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">照顧現場</p>
+                <h2 id="clinic-title">暖星療癒所</h2>
+              </div>
+              <p id="shift-message" class="shift-message" role="status" aria-live="polite">
+                班次尚未開始
+              </p>
             </div>
-            <p id="shift-message" class="shift-message" role="status" aria-live="polite">
-              班次尚未開始
-            </p>
-          </div>
 
-          <div class="clinic-content">
             <div class="patient-area">
               <div class="subheading-row">
-                <h3>來訪者</h3>
+                <div>
+                  <h3>來訪者</h3>
+                  <small>先判斷耐心與需求，再選擇要照顧的居民</small>
+                </div>
                 <span id="waiting-count" class="soft-chip">候診 0</span>
               </div>
               <div id="patient-list" class="patient-list" aria-live="polite"></div>
             </div>
+          </section>
 
-            <div class="station-area">
-              <h3 class="visually-hidden">工作站需求</h3>
-              <div id="station-list" class="station-list"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="play-area" aria-labelledby="board-title">
-          <aside class="side-panel demand-panel" aria-labelledby="demand-title">
-            <div>
-              <p class="eyebrow">現在最需要</p>
-              <h2 id="demand-title">工作需求</h2>
-            </div>
-            <div id="demand-list" class="demand-list"></div>
-            <p class="side-note">盤面補珠會輕微偏向當下需求，不會保證答案。</p>
-          </aside>
-
-          <div class="board-card">
-            <div class="board-toolbar">
+          <section class="care-workspace" aria-labelledby="dispatch-title">
+            <aside class="side-panel demand-panel" aria-labelledby="demand-title">
               <div>
-                <p class="eyebrow">連線工作盤</p>
-                <h2 id="board-title">拖曳相同符號，至少三顆</h2>
+                <p class="eyebrow">判斷優先順序</p>
+                <h2 id="demand-title">待辦總覽</h2>
               </div>
-              <div class="chain-readout" aria-live="polite">
-                <strong id="chain-summary">尚未選取</strong>
-                <span id="chain-preview">5 顆開始生成特殊珠</span>
+              <div id="demand-list" class="demand-list"></div>
+              <p class="side-note">橘色與紅色居民快失去耐心；先處理她們，才能維持療癒所安定。</p>
+            </aside>
+
+            <div class="dispatch-card">
+              <div class="dispatch-toolbar">
+                <div>
+                  <p class="eyebrow">療癒調度</p>
+                  <h2 id="dispatch-title">選居民，再安排正確工作</h2>
+                </div>
+                <div class="dispatch-readout" aria-live="polite">
+                  <strong id="selection-summary">尚未選擇來訪者</strong>
+                  <span id="selection-preview">每次正確照護都會累積技能能量</span>
+                </div>
               </div>
+
+              <div id="selected-visit" class="selected-visit" aria-live="polite">
+                開始班次後，點選一位來訪者。
+              </div>
+
+              <div id="station-list" class="station-action-grid" aria-label="療癒所工作站"></div>
+              <div id="care-feedback" class="care-feedback" role="status" aria-live="polite" hidden></div>
+              <p class="dispatch-hint">點選居民切換照顧對象；工作站準備完成後即可再次使用。</p>
             </div>
 
-            <div id="board-wrap" class="board-wrap">
-              <svg id="path-layer" class="path-layer" aria-hidden="true"></svg>
-              <div id="board-feedback" class="board-resolve-feedback" aria-hidden="true"></div>
-              <div
-                id="task-board"
-                class="task-board"
-                role="grid"
-                aria-label="七欄六列任務盤。方向鍵移動，空白鍵選取，Enter 完成，Escape 取消。"
-              ></div>
-              <div id="board-lock" class="board-lock" aria-hidden="true">
-                <span>Ⅱ</span>
-                <strong>班次暫停</strong>
+            <aside class="side-panel skill-panel" aria-labelledby="skill-title">
+              <div class="skill-heading">
+                <div>
+                  <p class="eyebrow">可愛搭檔的專長</p>
+                  <h2 id="skill-title">搭檔技能</h2>
+                </div>
+                <strong id="skill-charge-value">0%</strong>
               </div>
-            </div>
-
-            <div class="board-actions">
-              <button id="finish-chain" class="primary-button compact" type="button" disabled>
-                完成連線
-              </button>
-              <button id="cancel-chain" class="secondary-button compact" type="button" disabled>
-                取消
-              </button>
-              <p id="input-hint" class="input-hint">
-                滑鼠／觸控：按住拖曳 · 鍵盤：空白選取、Enter 完成
-              </p>
-            </div>
-          </div>
-
-          <aside class="side-panel echo-panel" aria-labelledby="echo-title">
-            <div>
-              <p class="eyebrow">多出的工作不浪費</p>
-              <h2 id="echo-title">回響庫存</h2>
-            </div>
-            <div id="echo-list" class="echo-list"></div>
-            <dl class="micro-stats">
-              <div><dt>最高連線</dt><dd id="longest-value">0</dd></div>
-              <div><dt>淨化混沌</dt><dd id="purified-value">0</dd></div>
-              <div><dt>分數</dt><dd id="score-value">0</dd></div>
-            </dl>
-          </aside>
-        </section>
+              <div class="skill-charge" role="progressbar" aria-label="搭檔技能能量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <span id="skill-charge-bar"></span>
+              </div>
+              <p class="side-note">能量充滿後，由你選一個技能施放；不是自動觸發。</p>
+              <div id="skill-list" class="skill-list"></div>
+              <div id="skill-feedback" class="skill-feedback" role="status" aria-live="polite" hidden></div>
+              <dl class="micro-stats">
+                <div><dt>最佳節奏</dt><dd id="best-flow-value">0</dd></div>
+                <div><dt>技能次數</dt><dd id="skills-used-value">0</dd></div>
+                <div><dt>分數</dt><dd id="score-value">0</dd></div>
+              </dl>
+            </aside>
+          </section>
         </div>
       </main>
     </div>
 
     <div id="briefing-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="briefing-title" hidden>
       <section class="modal-card briefing-card">
-        <p class="eyebrow">第一個可玩班次</p>
-        <h2 id="briefing-title">讓工作盤真的推動診所</h2>
+        <p class="eyebrow">療癒所值班</p>
+        <h2 id="briefing-title">照顧居民，也指揮可愛搭檔</h2>
         <p class="modal-lead">
-          上方每位來訪者都會產生一項工作。從下方盤面連起相同符號，工作就會立刻送回對應診療站。
+          每位來訪者都有不同需求與耐心。選擇居民、安排正確工作站，並在關鍵時刻施放搭檔技能。
         </p>
 
         <ol class="tutorial-steps">
-          <li><span>1</span><div><strong>看需求</strong><small>留意病患的下一步與耐心。</small></div></li>
-          <li><span>2</span><div><strong>連三顆</strong><small>八方向相鄰都能連，退回上一顆可撤銷。</small></div></li>
-          <li><span>3</span><div><strong>追長鏈</strong><small>5、7、10、13 顆會生成不同特殊珠。</small></div></li>
+          <li><span>1</span><div><strong>選居民</strong><small>優先照顧耐心較低、框線變橘或紅色的居民。</small></div></li>
+          <li><span>2</span><div><strong>派工作站</strong><small>依照居民身上的形狀與顏色，安排相同工作。</small></div></li>
+          <li><span>3</span><div><strong>放技能</strong><small>完成四次照護後，從三位搭檔中選擇一個技能。</small></div></li>
         </ol>
 
         <fieldset class="difficulty-picker">
@@ -330,7 +312,7 @@
           </label>
           <label>
             <input type="radio" name="difficulty" value="standard" checked />
-            <span><strong>標準</strong><small>推薦的經營與連線平衡</small></span>
+            <span><strong>標準</strong><small>推薦的判斷、調度與技能節奏</small></span>
           </label>
           <label>
             <input type="radio" name="difficulty" value="focus" />
@@ -341,7 +323,7 @@
         <div class="modal-actions">
           <button id="start-button" class="primary-button" type="button">開始 3 分鐘班次</button>
           <button id="briefing-return-town" class="secondary-button" type="button">先回小鎮</button>
-          <p>目標：照顧完成 5 位來訪者</p>
+          <p id="briefing-goal">目標：照顧完成 5 位來訪者</p>
         </div>
       </section>
     </div>
@@ -350,16 +332,15 @@
       <section class="modal-card help-card">
         <button class="modal-close" id="close-help" type="button" aria-label="關閉玩法說明">×</button>
         <p class="eyebrow">操作手冊</p>
-        <h2 id="help-title">四種工作，四種清楚形狀</h2>
+        <h2 id="help-title">看需求、排順序、放技能</h2>
         <div id="help-task-list" class="help-task-list"></div>
-        <h3>特殊珠</h3>
+        <h3>搭檔技能</h3>
         <ul class="special-list">
-          <li><strong>5–6 · 脈衝珠</strong><span>下次連到它會清除整列或整行。</span></li>
-          <li><strong>7–9 · 共鳴珠</strong><span>下次連到它會讓主工作量加倍。</span></li>
-          <li><strong>10–12 · 星核</strong><span>清除周圍，並凍結耐心 1.5 秒。</span></li>
-          <li><strong>13+ · 完美星核</strong><span>直接完成目前所有同類工作。</span></li>
+          <li><strong>艾芙 · 月芽盛放</strong><span>立即完成兩項最急迫的工作。</span></li>
+          <li><strong>賽恩 · 星時停駐</strong><span>暫停耐心 8 秒，並重置全部工作站。</span></li>
+          <li><strong>絨絨 · 安心抱抱</strong><span>回復全員耐心與療癒所安定。</span></li>
         </ul>
-        <p class="help-tip">混沌珠不能連；清掉旁邊任何任務珠即可淨化。</p>
+        <p class="help-tip">四次正確照護可充滿技能槽，而且每次都能自行選擇要施放哪一招。</p>
         <button id="resume-from-help" class="primary-button" type="button">知道了</button>
       </section>
     </div>
@@ -383,22 +364,23 @@
         <p id="result-praise" class="modal-lead"></p>
         <div class="result-grid">
           <div><span>完成照顧</span><strong id="result-served">0</strong></div>
-          <div><span>最高連線</span><strong id="result-longest">0</strong></div>
+          <div><span>最佳節奏</span><strong id="result-flow">0</strong></div>
           <div><span>最終安定</span><strong id="result-stability">0</strong></div>
+          <div><span>施放技能</span><strong id="result-skills">0</strong></div>
           <div><span>總分</span><strong id="result-score">0</strong></div>
         </div>
         <p id="result-tip" class="result-tip"></p>
         <p id="result-town-reward" class="result-town-reward"></p>
         <div class="modal-actions horizontal">
           <button id="return-town-button" class="primary-button" type="button">帶著成果回小鎮</button>
-          <button id="retry-button" class="primary-button" type="button">同一盤勢再試</button>
-          <button id="new-seed-button" class="secondary-button" type="button">換一個班次</button>
+          <button id="retry-button" class="primary-button" type="button">同一組居民再試</button>
+          <button id="new-seed-button" class="secondary-button" type="button">換一組來訪者</button>
         </div>
       </section>
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.3.0"></script>
+    <script type="module" src="./src/app.js?v=0.4.0"></script>
   </body>
 </html>

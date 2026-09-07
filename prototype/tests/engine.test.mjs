@@ -1,95 +1,67 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 
 import {
-  BOARD_COLUMNS,
-  BOARD_ROWS,
-  classifyChain,
-  createBoard,
+  SKILL_CHARGE_MAX,
+  TASK_IDS,
+  addSkillCharge,
+  advanceCooldowns,
   createRng,
-  findLegalPath,
   formatTime,
-  injectChaos,
-  isAdjacent,
   jobUrgency,
-  makeCell,
-  resolveMove,
-  validatePath
+  nextCareFlow,
+  resolveService,
+  selectServiceJob,
+  shuffledIndexes
 } from "../src/engine.js";
 
-function solidBoard(type = "care") {
-  return Array.from({ length: BOARD_COLUMNS * BOARD_ROWS }, (_, index) => makeCell(type, { id: `fixed-${index}` }));
-}
-
-test("seeded board generation is deterministic and playable", () => {
-  const first = createBoard({ rng: createRng("same-seed") });
-  const second = createBoard({ rng: createRng("same-seed") });
-  assert.deepEqual(first.map((cell) => cell.type), second.map((cell) => cell.type));
-  assert.equal(first.length, 42);
-  assert.ok(findLegalPath(first));
+test("seeded visitor order is deterministic and complete", () => {
+  const first = shuffledIndexes(8, createRng("same-town"));
+  const second = shuffledIndexes(8, createRng("same-town"));
+  assert.deepEqual(first, second);
+  assert.deepEqual([...first].sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7]);
 });
 
-test("adjacency supports diagonals without wrapping rows", () => {
-  assert.equal(isAdjacent(0, 1), true);
-  assert.equal(isAdjacent(0, 8), true);
-  assert.equal(isAdjacent(6, 7), false);
-  assert.equal(isAdjacent(8, 8), false);
+test("a selected resident keeps priority at the matching station", () => {
+  const jobs = [
+    { id: "a", patientId: "patient-a", type: "care", age: 8, deadline: 10, remaining: 4 },
+    { id: "b", patientId: "patient-b", type: "care", age: 2, deadline: 10, remaining: 2 }
+  ];
+  assert.equal(selectServiceJob(jobs, "care", "patient-b")?.id, "b");
+  assert.equal(selectServiceJob(jobs, "brew", "patient-b"), null);
 });
 
-test("path validation rejects repeated and mixed cells", () => {
-  const board = solidBoard("observe");
-  board[2] = makeCell("brew", { id: "mixed" });
-  assert.equal(validatePath(board, [0, 1, 2]).valid, false);
-  assert.equal(validatePath(board, [0, 1, 0]).valid, false);
-  assert.equal(validatePath(board, [0, 1]).valid, false);
+test("without a selected match, the most urgent resident is served", () => {
+  const jobs = [
+    { id: "calm", patientId: "a", type: "observe", age: 2, deadline: 10, remaining: 2 },
+    { id: "urgent", patientId: "b", type: "observe", age: 9, deadline: 10, remaining: 5 }
+  ];
+  assert.equal(selectServiceJob(jobs, "observe", "missing")?.id, "urgent");
 });
 
-test("chain thresholds map to the four special orb tiers", () => {
-  assert.equal(classifyChain(4), null);
-  assert.equal(classifyChain(5).kind, "pulse");
-  assert.equal(classifyChain(7).kind, "resonance");
-  assert.equal(classifyChain(10).kind, "star");
-  assert.equal(classifyChain(13).kind, "perfect");
+test("service work completes without making remaining work negative", () => {
+  assert.deepEqual(resolveService({ remaining: 5 }, 3), { workDone: 3, remaining: 2, completed: false });
+  assert.deepEqual(resolveService({ remaining: 2 }, 3), { workDone: 2, remaining: 0, completed: true });
+  assert.deepEqual(resolveService({ remaining: 2 }, -4), { workDone: 0, remaining: 2, completed: false });
 });
 
-test("five-chain produces a pulse orb and preserves board size", () => {
-  const board = solidBoard("care");
-  const result = resolveMove(board, [0, 1, 2, 3, 4], { rng: createRng("pulse-test") });
-  assert.equal(result.valid, true);
-  assert.equal(result.createdSpecial.kind, "pulse");
-  assert.equal(result.workByType.care, 5);
-  assert.deepEqual(result.removedIndices, [1, 2, 3, 4]);
-  assert.equal(result.board.length, 42);
-  assert.equal(result.board.filter((cell) => cell.special === "pulse").length, 1);
+test("all station cooldowns advance safely", () => {
+  const result = advanceCooldowns({ observe: 1, brew: 0.2, care: 4, comfort: 0 }, 0.5);
+  assert.deepEqual(Object.keys(result), TASK_IDS);
+  assert.deepEqual(result, { observe: 0.5, brew: 0, care: 3.5, comfort: 0 });
 });
 
-test("an activated resonance orb doubles primary work", () => {
-  const board = solidBoard("brew");
-  board[0].special = "resonance";
-  const result = resolveMove(board, [0, 1, 2], { rng: createRng("resonance-test") });
-  assert.equal(result.valid, true);
-  assert.deepEqual(result.activated, ["resonance"]);
-  assert.equal(result.workByType.brew, 6);
+test("care flow continues inside its window and resets outside it", () => {
+  assert.equal(nextCareFlow(3, 10, 14), 4);
+  assert.equal(nextCareFlow(3, 10, 16), 1);
+  assert.equal(nextCareFlow(0, null, 2), 1);
 });
 
-test("pulse clears its line and a neighboring chaos orb is purified", () => {
-  const board = solidBoard("comfort");
-  board[0].special = "pulse";
-  board[0].orientation = "horizontal";
-  board[9] = makeCell(null, { id: "chaos", chaos: true });
-  const result = resolveMove(board, [0, 1, 8], { rng: createRng("chaos-test") });
-  assert.equal(result.valid, true);
-  assert.ok(result.clearedCount >= BOARD_COLUMNS);
-  assert.equal(result.purified, 1);
-  assert.equal(result.board.some((cell) => cell.id === "chaos"), false);
-});
-
-test("chaos injection replaces a normal orb while keeping a legal move", () => {
-  const board = solidBoard("observe");
-  const result = injectChaos(board, createRng("inject"), "observe");
-  assert.ok(result.index >= 0);
-  assert.equal(result.board[result.index].chaos, true);
-  assert.ok(findLegalPath(result.board));
+test("skill charge grows by correct services and caps at full", () => {
+  assert.equal(addSkillCharge(0), 25);
+  assert.equal(addSkillCharge(75), SKILL_CHARGE_MAX);
+  assert.equal(addSkillCharge(95, 30), SKILL_CHARGE_MAX);
+  assert.equal(addSkillCharge(10, -10), 10);
 });
 
 test("urgency and clock formatting expose clear player-facing states", () => {
