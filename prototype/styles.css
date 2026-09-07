@@ -752,8 +752,16 @@ h3 {
   box-shadow:
     inset 0 0 0 4px rgba(5, 10, 23, 0.34),
     0 10px 32px rgba(0, 0, 0, 0.3);
+  overscroll-behavior: none;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+html.is-board-dragging,
+body.is-board-dragging {
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .board-wrap::before,

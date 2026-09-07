@@ -479,6 +479,7 @@ function frame(timestamp) {
 }
 
 function startGame({ keepDifficulty = false } = {}) {
+  clearPointerDrag();
   const selectedDifficulty = keepDifficulty
     ? state.difficulty
     : document.querySelector('input[name="difficulty"]:checked')?.value ?? "standard";
@@ -502,6 +503,7 @@ function startGame({ keepDifficulty = false } = {}) {
 function pauseGame() {
   if (state.status !== "running") return;
   state.status = "paused";
+  clearPointerDrag();
   cancelSelection(false);
   elements.pauseModal.hidden = false;
   elements.pauseButton.textContent = "▶";
@@ -525,6 +527,7 @@ function openHelp() {
   if (!elements.helpModal.hidden) return;
   helpReturnStatus = state.status;
   if (state.status === "running") state.status = "help";
+  clearPointerDrag();
   cancelSelection(false);
   elements.helpModal.hidden = false;
   renderDynamic();
@@ -544,6 +547,7 @@ function endShift(reason) {
   if (state.status === "result") return;
   state.status = "result";
   state.endedBy = reason;
+  clearPointerDrag();
   selection = [];
   elements.pauseButton.disabled = true;
   renderAll();
@@ -919,6 +923,29 @@ function pointerIndex(event) {
   return Number(target.dataset.index);
 }
 
+function setBoardDragLock(active) {
+  document.documentElement.classList.toggle("is-board-dragging", active);
+  document.body.classList.toggle("is-board-dragging", active);
+}
+
+function preventBoardTouchScroll(event) {
+  if (tapMode || state.status !== "running") return;
+  if (pointerDragging || event.target.closest?.(".orb")) event.preventDefault();
+}
+
+function clearPointerDrag() {
+  const activePointerId = pointerId;
+  pointerDragging = false;
+  pointerId = null;
+  setBoardDragLock(false);
+  if (activePointerId === null) return;
+  try {
+    elements.board.releasePointerCapture?.(activePointerId);
+  } catch {
+    // Pointer capture can already be released when the browser cancels a gesture.
+  }
+}
+
 function onPointerDown(event) {
   if (tapMode || state.status !== "running" || event.button > 0) return;
   const orb = event.target.closest(".orb");
@@ -927,6 +954,7 @@ function onPointerDown(event) {
   selection = [];
   pointerDragging = true;
   pointerId = event.pointerId;
+  setBoardDragLock(true);
   elements.board.setPointerCapture?.(event.pointerId);
   selectCell(Number(orb.dataset.index));
 }
@@ -941,14 +969,9 @@ function onPointerMove(event) {
 function onPointerEnd(event) {
   if (!pointerDragging || event.pointerId !== pointerId) return;
   event.preventDefault();
-  pointerDragging = false;
-  try {
-    elements.board.releasePointerCapture?.(event.pointerId);
-  } catch {
-    // Pointer capture can already be released if the browser cancelled the gesture.
-  }
-  pointerId = null;
-  resolveSelection();
+  clearPointerDrag();
+  if (event.type === "pointercancel") cancelSelection(false);
+  else resolveSelection();
 }
 
 function moveFocus(key) {
@@ -980,10 +1003,13 @@ function buildStaticHelp() {
   $("#briefing-modal .modal-actions p").textContent = `目標：照顧完成 ${shiftGoal} 位來訪者`;
 }
 
-elements.board.addEventListener("pointerdown", onPointerDown);
-elements.board.addEventListener("pointermove", onPointerMove);
-elements.board.addEventListener("pointerup", onPointerEnd);
-elements.board.addEventListener("pointercancel", onPointerEnd);
+elements.board.addEventListener("pointerdown", onPointerDown, { passive: false });
+elements.board.addEventListener("pointermove", onPointerMove, { passive: false });
+elements.board.addEventListener("pointerup", onPointerEnd, { passive: false });
+elements.board.addEventListener("pointercancel", onPointerEnd, { passive: false });
+elements.board.addEventListener("touchstart", preventBoardTouchScroll, { passive: false });
+elements.board.addEventListener("touchmove", preventBoardTouchScroll, { passive: false });
+document.addEventListener("touchmove", preventBoardTouchScroll, { capture: true, passive: false });
 elements.board.addEventListener("focusin", (event) => {
   const orb = event.target.closest?.(".orb");
   if (orb) focusedIndex = Number(orb.dataset.index);
@@ -1052,6 +1078,7 @@ window.addEventListener("keydown", (event) => {
   else if (state.status === "running" && !selection.length) pauseGame();
 });
 window.addEventListener("resize", renderPath);
+window.addEventListener("blur", clearPointerDrag);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && state.status === "running") pauseGame();
 });
