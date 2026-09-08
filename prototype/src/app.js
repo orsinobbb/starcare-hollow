@@ -690,7 +690,7 @@ function renderBoard() {
     button.innerHTML = `
       <span class="match-card-inner">
         <span class="match-card-back" aria-hidden="true"><b>✦</b><i>•ᴗ•</i></span>
-        <span class="match-card-front" aria-hidden="true"><b>${card.symbol}</b><i>${card.name}</i></span>
+        <span class="match-card-front" aria-hidden="true"><b class="card-character family-${card.familyId}"></b><i>${card.name}</i></span>
       </span>`;
     elements.gameBoard.append(button);
   }

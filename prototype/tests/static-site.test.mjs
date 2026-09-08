@@ -63,11 +63,13 @@ test("game house ships three short-game modes and player-chosen skills", async (
   assert.doesNotMatch(html, /id="patient-list"|id="station-list"/);
   assert.match(css, /\.minigame-workspace/);
   assert.match(css, /\.match-card/);
+  assert.match(css, /assets\/card-companions-v1\.jpg/);
   assert.match(css, /\.collection-tray/);
   assert.match(css, /\.skill-card\.is-ready/);
   assert.match(app, /function handleCard/);
   assert.match(app, /function handleTripleCard/);
   assert.match(app, /function activateSkill/);
+  await access(new URL("assets/card-companions-v1.jpg", siteRootUrl));
 });
 
 test("clinic uses ordinary buttons so the page remains scrollable on touch screens", async () => {

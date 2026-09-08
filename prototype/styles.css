@@ -3226,33 +3226,58 @@ body.is-board-dragging {
 
 .match-card-front {
   grid-template-rows: 1fr auto;
-  padding: 0.45rem;
-  color: #17213a;
-  background: linear-gradient(145deg, #f9f1dc, #d9e3ec);
+  padding: 0.34rem;
+  color: #fff8e8;
+  background: linear-gradient(145deg, #132443, #07152d);
   transform: rotateY(180deg);
 }
 
-.match-card-front b {
-  align-self: end;
-  font-size: clamp(1.65rem, 4vw, 2.7rem);
-  filter: drop-shadow(0 3px 3px rgba(25, 34, 58, 0.18));
+.card-character {
+  align-self: center;
+  width: 78%;
+  max-width: 108px;
+  aspect-ratio: 0.75;
+  margin: 0 auto;
+  background-image: url("./assets/card-companions-v1.jpg");
+  background-repeat: no-repeat;
+  background-size: 400% auto;
+  border-radius: 12px;
+  filter: drop-shadow(0 5px 7px rgba(0, 0, 0, 0.3));
 }
 
 .match-card-front i {
-  padding: 0.18rem 0.3rem;
+  position: relative;
+  z-index: 1;
+  justify-self: center;
+  padding: 0.18rem 0.48rem;
+  color: #fff7df;
   font-size: clamp(0.58rem, 1.2vw, 0.72rem);
   font-style: normal;
   font-weight: 900;
+  line-height: 1.2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  background: rgba(4, 13, 30, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 99px;
 }
 
-.match-card.palette-sky .match-card-front { background: linear-gradient(145deg, #effcff, #a9e2f2); }
-.match-card.palette-moon .match-card-front { background: linear-gradient(145deg, #f8f0ff, #c8bbef); }
-.match-card.palette-rose .match-card-front { background: linear-gradient(145deg, #fff3f1, #f5b6bd); }
-.match-card.palette-indigo .match-card-front { background: linear-gradient(145deg, #eef0ff, #aebcf1); }
-.match-card.palette-leaf .match-card-front { background: linear-gradient(145deg, #f0fff1, #abe0b7); }
-.match-card.palette-amber .match-card-front { background: linear-gradient(145deg, #fff8e5, #f2cb7a); }
-.match-card.palette-mint .match-card-front { background: linear-gradient(145deg, #edfff9, #9cdac9); }
-.match-card.palette-coral .match-card-front { background: linear-gradient(145deg, #fff0ed, #f5a99b); }
+.card-character.family-cloud { background-position: 0% 14%; }
+.card-character.family-moon { background-position: 33.333% 14%; }
+.card-character.family-flower { background-position: 66.667% 14%; }
+.card-character.family-star { background-position: 100% 14%; }
+.card-character.family-leaf { background-position: 0% 75%; }
+.card-character.family-crystal { background-position: 33.333% 75%; }
+.card-character.family-bird { background-position: 66.667% 75%; }
+.card-character.family-heart { background-position: 100% 75%; }
+
+.match-card.palette-sky .match-card-front { border-color: rgba(152, 220, 255, 0.72); }
+.match-card.palette-moon .match-card-front { border-color: rgba(211, 190, 255, 0.72); }
+.match-card.palette-rose .match-card-front { border-color: rgba(255, 179, 195, 0.72); }
+.match-card.palette-indigo .match-card-front { border-color: rgba(160, 178, 255, 0.72); }
+.match-card.palette-leaf .match-card-front { border-color: rgba(160, 224, 164, 0.72); }
+.match-card.palette-amber .match-card-front { border-color: rgba(255, 215, 126, 0.76); }
+.match-card.palette-mint .match-card-front { border-color: rgba(150, 229, 205, 0.72); }
+.match-card.palette-coral .match-card-front { border-color: rgba(255, 166, 151, 0.76); }
 
 .match-card.is-selected .match-card-front {
   border-color: #fff4c7;
