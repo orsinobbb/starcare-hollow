@@ -3,6 +3,13 @@ import { EXPEDITION_HEIGHT, EXPEDITION_WIDTH, isInBounds, isRevealed, targetAt, 
 const MAX_PARTICLES = 40;
 const TAP_DISTANCE_PX = 8;
 const FIXED_STEP_SECONDS = 1 / 60;
+const EXCAVATION_TIMELINE = {
+  aim: 0.22,
+  impact: 0.18,
+  reveal: 0.36,
+  settle: 0.28,
+  discovery: 0.68
+};
 
 const TERRAIN_COLORS = {
   sand: { fill: "#aa7a41", edge: "#f1c675", accent: "#ffe4a6" },
@@ -30,11 +37,12 @@ function drawRoundedRect(context, x, y, width, height, radius) {
 }
 
 export class ExpeditionRenderer {
-  constructor(canvas, { onExcavate = () => {}, onFocusTile = () => {} } = {}) {
+  constructor(canvas, { onExcavate = () => {}, onFocusTile = () => {}, onStage = () => {} } = {}) {
     this.canvas = canvas;
     this.context = canvas.getContext("2d", { alpha: false });
     this.onExcavate = onExcavate;
     this.onFocusTile = onFocusTile;
+    this.onStage = onStage;
     this.state = null;
     this.width = 1;
     this.height = 1;
@@ -45,6 +53,8 @@ export class ExpeditionRenderer {
     this.pointer = null;
     this.hoverTile = null;
     this.particles = [];
+    this.excavation = null;
+    this.shake = { x: 0, y: 0, energy: 0 };
     this.running = false;
     this.frameHandle = null;
     this.lastTime = 0;
@@ -82,6 +92,7 @@ export class ExpeditionRenderer {
     this.running = false;
     if (this.frameHandle) cancelAnimationFrame(this.frameHandle);
     this.frameHandle = null;
+    this.finishExcavation();
   }
 
   destroy() {
@@ -139,6 +150,111 @@ export class ExpeditionRenderer {
       particle.vy += 0.46 * delta;
     }
     this.particles = this.particles.filter((particle) => particle.life > 0);
+    this.updateExcavation(delta);
+    this.updateShake(delta);
+  }
+
+  updateShake(delta) {
+    if (this.reducedMotion || this.shake.energy <= 0) {
+      this.shake.x = 0;
+      this.shake.y = 0;
+      this.shake.energy = 0;
+      return;
+    }
+    this.shake.energy = Math.max(0, this.shake.energy - delta * 8);
+    this.shake.x = (Math.random() * 2 - 1) * this.shake.energy;
+    this.shake.y = (Math.random() * 2 - 1) * this.shake.energy * 0.62;
+  }
+
+  timelineFor(event) {
+    const multiplier = this.reducedMotion ? 0.52 : 1;
+    const timeline = {
+      aim: EXCAVATION_TIMELINE.aim * multiplier,
+      impact: EXCAVATION_TIMELINE.impact * multiplier,
+      reveal: EXCAVATION_TIMELINE.reveal * multiplier,
+      settle: EXCAVATION_TIMELINE.settle * multiplier,
+      discovery: event.type === "discovery" ? EXCAVATION_TIMELINE.discovery * multiplier : 0
+    };
+    timeline.total = timeline.aim + timeline.impact + timeline.reveal + timeline.settle + timeline.discovery;
+    return timeline;
+  }
+
+  emitExcavationStage(stage) {
+    if (!this.excavation || this.excavation.stage === stage) return;
+    this.excavation.stage = stage;
+    this.onStage({ stage, tile: this.excavation.tile, event: this.excavation.event });
+  }
+
+  updateExcavation(delta) {
+    const animation = this.excavation;
+    if (!animation) return;
+    animation.elapsed += delta;
+    const { timeline, event, tile } = animation;
+    const impactAt = timeline.aim;
+    const revealAt = impactAt + timeline.impact;
+    const discoveryAt = revealAt + timeline.reveal;
+
+    if (animation.elapsed < impactAt) {
+      this.emitExcavationStage("aim");
+    } else if (animation.elapsed < revealAt) {
+      this.emitExcavationStage("impact");
+      if (!animation.impactBurst) {
+        animation.impactBurst = true;
+        this.shake.energy = this.reducedMotion ? 0 : 3.2;
+        this.spawnBurst(tile, event.terrain, 13, "dust");
+      }
+    } else if (animation.elapsed < discoveryAt) {
+      this.emitExcavationStage("reveal");
+      if (!animation.revealBurst) {
+        animation.revealBurst = true;
+        this.spawnBurst(tile, event.terrain, event.type === "discovery" ? 12 : 7, "shard");
+      }
+    } else if (event.type === "discovery" && animation.elapsed < timeline.total - timeline.settle) {
+      this.emitExcavationStage("discovery");
+      if (!animation.discoveryBurst) {
+        animation.discoveryBurst = true;
+        this.shake.energy = this.reducedMotion ? 0 : 1.6;
+        this.spawnBurst(tile, event.terrain, 18, "star");
+      }
+    } else {
+      this.emitExcavationStage("settle");
+    }
+
+    if (animation.elapsed >= timeline.total) {
+      this.finishExcavation();
+    }
+  }
+
+  finishExcavation() {
+    const animation = this.excavation;
+    if (!animation) return;
+    this.emitExcavationStage("settle");
+    this.excavation = null;
+    this.shake = { x: 0, y: 0, energy: 0 };
+    animation.resolve?.();
+  }
+
+  spawnBurst(tile, terrain, count, shape) {
+    const terrainColors = TERRAIN_COLORS[terrain?.id] ?? TERRAIN_COLORS.sand;
+    const colors = shape === "star"
+      ? ["#fff9c8", "#ffd66f", "#8ff2e3"]
+      : [terrainColors.accent, terrainColors.edge, terrainColors.fill];
+    const maximum = this.reducedMotion ? 0 : Math.min(count, MAX_PARTICLES - this.particles.length);
+    for (let index = 0; index < maximum; index += 1) {
+      const angle = (Math.PI * 2 * index) / Math.max(1, maximum) + Math.random() * 0.28;
+      const speed = shape === "star" ? 1.35 + Math.random() * 1.5 : 0.66 + Math.random() * 1.18;
+      this.particles.push({
+        x: tile.x + (Math.random() - 0.5) * 0.14,
+        y: tile.y + (Math.random() - 0.5) * 0.14,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - (shape === "star" ? 0.72 : 0.32),
+        life: shape === "star" ? 0.72 + Math.random() * 0.38 : 0.38 + Math.random() * 0.34,
+        maxLife: shape === "star" ? 1.1 : 0.72,
+        size: shape === "star" ? 2.8 + Math.random() * 2.4 : 2 + Math.random() * 2.1,
+        color: colors[index % colors.length],
+        shape
+      });
+    }
   }
 
   viewBounds() {
@@ -175,7 +291,7 @@ export class ExpeditionRenderer {
   }
 
   handlePointerDown(event) {
-    if (!this.state || event.button > 0) return;
+    if (!this.state || this.excavation || event.button > 0) return;
     this.canvas.focus({ preventScroll: true });
     this.canvas.setPointerCapture(event.pointerId);
     this.pointer = {
@@ -244,7 +360,7 @@ export class ExpeditionRenderer {
   }
 
   handleKeydown(event) {
-    if (!this.state) return;
+    if (!this.state || this.excavation) return;
     const steps = {
       ArrowUp: [0, -1],
       ArrowDown: [0, 1],
@@ -267,23 +383,32 @@ export class ExpeditionRenderer {
     }
   }
 
-  celebrate(tile, type = "dig") {
-    const maximum = this.reducedMotion ? 8 : type === "discovery" ? 26 : 12;
-    const colors = type === "discovery" ? ["#fff7bd", "#ffd76a", "#9df0e2"] : ["#d4edac", "#b8e59a", "#f1d59a"];
-    for (let index = 0; index < maximum && this.particles.length < MAX_PARTICLES; index += 1) {
-      const angle = (Math.PI * 2 * index) / maximum + Math.random() * 0.22;
-      const speed = (type === "discovery" ? 1.4 : 0.8) + Math.random() * 1.35;
-      this.particles.push({
-        x: tile.x,
-        y: tile.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 0.45,
-        life: 0.45 + Math.random() * 0.42,
-        maxLife: 0.85,
-        size: 2.5 + Math.random() * 2.2,
-        color: colors[index % colors.length]
-      });
-    }
+  playExcavation(tile, event) {
+    if (this.excavation) return Promise.resolve();
+    const timeline = this.timelineFor(event);
+    return new Promise((resolve) => {
+      this.excavation = {
+        tile,
+        event,
+        timeline,
+        elapsed: 0,
+        stage: null,
+        impactBurst: false,
+        revealBurst: false,
+        discoveryBurst: false,
+        resolve
+      };
+      this.emitExcavationStage("aim");
+      this.render();
+      if (!this.running) {
+        window.setTimeout(() => {
+          if (this.excavation?.resolve === resolve) {
+            this.finishExcavation();
+            this.render();
+          }
+        }, Math.ceil(timeline.total * 1000));
+      }
+    });
   }
 
   render() {
@@ -322,6 +447,8 @@ export class ExpeditionRenderer {
 
   drawMap(context) {
     const padding = this.tileSize * 0.06;
+    context.save();
+    context.translate(this.shake.x, this.shake.y);
     for (let y = 0; y < this.state.height; y += 1) {
       for (let x = 0; x < this.state.width; x += 1) {
         const screen = this.tileToScreen(x, y);
@@ -334,6 +461,7 @@ export class ExpeditionRenderer {
         this.drawTile(context, x, y, left, top, size, revealed, selectable);
       }
     }
+    context.restore();
   }
 
   isSelectable(x, y) {
@@ -368,7 +496,10 @@ export class ExpeditionRenderer {
       context.stroke();
       this.drawTerrainDetails(context, terrain.id, left, top, size, colors);
       const target = targetAt(this.state, x, y);
-      if (target && this.state.foundTargetIds.includes(target.id)) this.drawRelic(context, target, left + size / 2, top + size / 2, size);
+      const animation = this.activeExcavationAt(x, y);
+      if (target && this.state.foundTargetIds.includes(target.id)) {
+        this.drawRelic(context, target, left + size / 2, top + size / 2, size, this.relicRevealProgress(animation));
+      }
     } else {
       const fog = context.createLinearGradient(left, top, left + size, top + size);
       fog.addColorStop(0, "#5f69a0");
@@ -393,6 +524,152 @@ export class ExpeditionRenderer {
       context.lineWidth = isKeyboardTile ? 2.6 : 1.7;
       context.stroke();
     }
+
+    const animation = this.activeExcavationAt(x, y);
+    if (animation) this.drawExcavationOverlay(context, animation, left, top, size, radius);
+  }
+
+  activeExcavationAt(x, y) {
+    const animation = this.excavation;
+    if (!animation || animation.tile.x !== x || animation.tile.y !== y) return null;
+    return animation;
+  }
+
+  revealProgress(animation) {
+    if (!animation) return 1;
+    const { timeline } = animation;
+    const revealStart = timeline.aim + timeline.impact;
+    return clamp((animation.elapsed - revealStart) / Math.max(0.001, timeline.reveal), 0, 1);
+  }
+
+  relicRevealProgress(animation) {
+    if (!animation) return 1;
+    const reveal = this.revealProgress(animation);
+    if (animation.event.type !== "discovery") return 1;
+    const discoveryStart = animation.timeline.aim + animation.timeline.impact + animation.timeline.reveal * 0.58;
+    return reveal * clamp((animation.elapsed - discoveryStart) / Math.max(0.001, animation.timeline.discovery * 0.48), 0, 1);
+  }
+
+  drawExcavationOverlay(context, animation, left, top, size, radius) {
+    const reveal = this.revealProgress(animation);
+    const centerX = left + size / 2;
+    const centerY = top + size / 2;
+    const { timeline, elapsed, event } = animation;
+    const impactStart = timeline.aim;
+    const revealStart = impactStart + timeline.impact;
+    const discoveryStart = revealStart + timeline.reveal;
+
+    if (reveal < 1) {
+      context.save();
+      context.globalAlpha = 1 - reveal;
+      const cover = context.createLinearGradient(left, top, left + size, top + size);
+      cover.addColorStop(0, "#6071a5");
+      cover.addColorStop(0.55, "#2e416a");
+      cover.addColorStop(1, "#17294e");
+      drawRoundedRect(context, left, top, size, size, radius);
+      context.fillStyle = cover;
+      context.fill();
+      context.strokeStyle = "rgba(221, 234, 255, 0.48)";
+      context.lineWidth = 1.4;
+      context.stroke();
+      context.restore();
+    }
+
+    const aimProgress = clamp(elapsed / Math.max(0.001, timeline.aim), 0, 1);
+    if (elapsed < revealStart) {
+      this.drawTargetRing(context, centerX, centerY, size, aimProgress, elapsed >= impactStart);
+      this.drawSpade(context, centerX, centerY, size, aimProgress, elapsed >= impactStart);
+    }
+
+    if (elapsed >= impactStart && elapsed < revealStart + timeline.reveal * 0.65) {
+      const crackProgress = clamp((elapsed - impactStart) / Math.max(0.001, timeline.impact + timeline.reveal * 0.65), 0, 1);
+      context.save();
+      context.globalAlpha = 0.7 * (1 - reveal * 0.5);
+      context.strokeStyle = "#fff0af";
+      context.lineWidth = Math.max(1.1, size * 0.038);
+      context.beginPath();
+      context.moveTo(centerX - size * 0.29, centerY - size * 0.08);
+      context.lineTo(centerX - size * 0.06, centerY + size * 0.02);
+      context.lineTo(centerX + size * (0.06 + 0.1 * crackProgress), centerY - size * 0.13);
+      context.lineTo(centerX + size * 0.27, centerY + size * 0.16);
+      context.stroke();
+      context.restore();
+    }
+
+    if (event.type === "discovery" && elapsed >= discoveryStart - timeline.reveal * 0.2) {
+      const discoveryProgress = clamp((elapsed - (discoveryStart - timeline.reveal * 0.2)) / Math.max(0.001, timeline.discovery), 0, 1);
+      this.drawDiscoveryAura(context, centerX, centerY, size, discoveryProgress);
+    } else if (reveal > 0.16) {
+      const shimmer = 0.18 + Math.sin(elapsed * 28) * 0.08;
+      context.save();
+      context.globalAlpha = shimmer * reveal;
+      context.fillStyle = "#fff8c4";
+      context.beginPath();
+      context.arc(centerX, centerY, size * (0.24 + reveal * 0.16), 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    }
+  }
+
+  drawTargetRing(context, x, y, size, progress, impacted) {
+    const pulse = 1 + Math.sin(progress * Math.PI * 2) * 0.08;
+    context.save();
+    context.globalAlpha = impacted ? 0.42 : 0.78;
+    context.strokeStyle = impacted ? "#ffe8a0" : "#c8f7cf";
+    context.lineWidth = Math.max(1.3, size * 0.034);
+    context.beginPath();
+    context.arc(x, y, size * (0.28 + progress * 0.1) * pulse, 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  }
+
+  drawSpade(context, x, y, size, progress, impacted) {
+    const fall = impacted ? 1 : progress;
+    const bounce = impacted ? Math.sin(clamp((progress - 0.82) / 0.18, 0, 1) * Math.PI) * size * 0.07 : 0;
+    const offsetY = size * (-0.86 + fall * 0.72) - bounce;
+    context.save();
+    context.translate(x, y + offsetY);
+    context.rotate(-0.54 + fall * 0.2);
+    context.lineCap = "round";
+    context.strokeStyle = "#855339";
+    context.lineWidth = Math.max(3, size * 0.085);
+    context.beginPath();
+    context.moveTo(0, -size * 0.36);
+    context.lineTo(0, size * 0.11);
+    context.stroke();
+    context.strokeStyle = "#e8c78d";
+    context.lineWidth = Math.max(1.4, size * 0.032);
+    context.beginPath();
+    context.moveTo(0, -size * 0.37);
+    context.lineTo(0, size * 0.1);
+    context.stroke();
+    context.fillStyle = "#d7e3ef";
+    context.strokeStyle = "#6f8ca6";
+    context.lineWidth = Math.max(1.2, size * 0.025);
+    context.beginPath();
+    context.moveTo(-size * 0.16, size * 0.08);
+    context.quadraticCurveTo(0, size * 0.35, size * 0.16, size * 0.08);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.restore();
+  }
+
+  drawDiscoveryAura(context, x, y, size, progress) {
+    const radius = size * (0.24 + progress * 0.58);
+    context.save();
+    context.globalAlpha = (1 - progress) * 0.58;
+    context.strokeStyle = "#fff0a5";
+    context.lineWidth = Math.max(1.2, size * 0.032);
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.stroke();
+    context.globalAlpha = 0.15 + Math.sin(progress * Math.PI) * 0.2;
+    context.fillStyle = "#fff6b8";
+    context.beginPath();
+    context.arc(x, y, size * (0.2 + progress * 0.22), 0, Math.PI * 2);
+    context.fill();
+    context.restore();
   }
 
   drawTerrainDetails(context, terrainId, left, top, size, colors) {
@@ -430,25 +707,30 @@ export class ExpeditionRenderer {
     context.restore();
   }
 
-  drawRelic(context, target, x, y, size) {
+  drawRelic(context, target, x, y, size, reveal = 1) {
+    if (reveal <= 0) return;
     const radius = size * 0.22;
+    const spring = 1 + Math.sin(clamp(reveal, 0, 1) * Math.PI) * 0.22;
     context.save();
+    context.globalAlpha = clamp(reveal * 1.7, 0, 1);
+    context.translate(x, y + (1 - reveal) * size * 0.48);
+    context.scale(reveal * spring, reveal * spring);
     context.shadowColor = "rgba(255, 219, 104, 0.86)";
     context.shadowBlur = size * 0.28;
-    const glow = context.createRadialGradient(x, y, 0, x, y, radius * 1.75);
+    const glow = context.createRadialGradient(0, 0, 0, 0, 0, radius * 1.75);
     glow.addColorStop(0, "#fff7ba");
     glow.addColorStop(0.44, "#f7bf4c");
     glow.addColorStop(1, "rgba(247,191,76,0)");
     context.fillStyle = glow;
     context.beginPath();
-    context.arc(x, y, radius * 1.75, 0, Math.PI * 2);
+    context.arc(0, 0, radius * 1.75, 0, Math.PI * 2);
     context.fill();
     context.shadowBlur = 0;
     context.fillStyle = "#fff6bc";
     context.font = `bold ${Math.max(14, size * 0.42)}px Georgia, serif`;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(target.icon, x, y + 1);
+    context.fillText(target.icon, 0, 1);
     context.restore();
   }
 
@@ -461,9 +743,34 @@ export class ExpeditionRenderer {
       context.fillStyle = particle.color;
       context.shadowColor = particle.color;
       context.shadowBlur = 10;
-      context.beginPath();
-      context.arc(screen.x, screen.y, particle.size, 0, Math.PI * 2);
-      context.fill();
+      if (particle.shape === "star") {
+        context.translate(screen.x, screen.y);
+        context.rotate((1 - alpha) * Math.PI);
+        context.beginPath();
+        context.moveTo(0, -particle.size * 1.8);
+        context.lineTo(particle.size * 0.55, -particle.size * 0.55);
+        context.lineTo(particle.size * 1.8, 0);
+        context.lineTo(particle.size * 0.55, particle.size * 0.55);
+        context.lineTo(0, particle.size * 1.8);
+        context.lineTo(-particle.size * 0.55, particle.size * 0.55);
+        context.lineTo(-particle.size * 1.8, 0);
+        context.lineTo(-particle.size * 0.55, -particle.size * 0.55);
+        context.closePath();
+        context.fill();
+      } else if (particle.shape === "shard") {
+        context.translate(screen.x, screen.y);
+        context.rotate((1 - alpha) * 4);
+        context.beginPath();
+        context.moveTo(0, -particle.size * 1.3);
+        context.lineTo(particle.size, particle.size);
+        context.lineTo(-particle.size, particle.size * 0.72);
+        context.closePath();
+        context.fill();
+      } else {
+        context.beginPath();
+        context.arc(screen.x, screen.y, particle.size, 0, Math.PI * 2);
+        context.fill();
+      }
       context.restore();
     }
   }

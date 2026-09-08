@@ -101,10 +101,12 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
   const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
   const renderer = await readFile(new URL("src/expedition-renderer.js", siteRootUrl), "utf8");
+  const controller = await readFile(new URL("src/expedition.js", siteRootUrl), "utf8");
   const expedition = await readFile(new URL("src/expedition-engine.js", siteRootUrl), "utf8");
 
   assert.match(html, /id="expedition-view"/);
   assert.match(html, /id="expedition-canvas"[^>]*tabindex="0"/);
+  assert.match(html, /id="expedition-stage"[^>]*role="status"/);
   assert.match(html, /id="expedition-map-help"/);
   assert.match(css, /#expedition-canvas[\s\S]*touch-action:\s*none/);
   assert.match(css, /#expedition-canvas[\s\S]*height:\s*clamp/);
@@ -112,6 +114,15 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(renderer, /devicePixelRatio/);
   assert.match(renderer, /FIXED_STEP_SECONDS/);
   assert.match(renderer, /MAX_PARTICLES/);
+  assert.match(renderer, /EXCAVATION_TIMELINE/);
+  assert.match(renderer, /playExcavation/);
+  assert.match(renderer, /drawSpade/);
+  assert.match(renderer, /drawExcavationOverlay/);
+  assert.match(css, /\.expedition-stage/);
+  assert.match(css, /@keyframes\s+expedition-stage-impact/);
+  assert.match(css, /prefers-reduced-motion[\s\S]*\.expedition-stage > span/);
+  assert.match(controller, /isAnimating/);
+  assert.match(controller, /await renderer\.playExcavation/);
   assert.match(expedition, /createExpeditionState/);
   assert.match(expedition, /compassClue/);
 });

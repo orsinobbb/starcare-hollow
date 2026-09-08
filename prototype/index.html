@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.6.0</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.6.1</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -262,6 +262,10 @@
                 <span class="map-status-chip">自動儲存</span>
               </div>
               <canvas id="expedition-canvas" tabindex="0" aria-label="星砂群島探索地圖" aria-describedby="expedition-map-help"></canvas>
+              <div id="expedition-stage" class="expedition-stage" data-stage="ready" role="status" aria-live="polite">
+                <span aria-hidden="true">⌁</span>
+                <p>每一次調查都會先呈現定位、翻土與地表回應。</p>
+              </div>
               <p id="expedition-map-help" class="expedition-map-help">地圖內：單指拖曳移動鏡頭，輕點相鄰迷霧格調查。鍵盤可用方向鍵選格、Enter 調查；地圖外仍可正常捲動與縮放。</p>
               <p id="expedition-log" class="expedition-log" role="status" aria-live="polite">羅盤待命：從起點相鄰的格子開始調查。</p>
             </section>
@@ -483,6 +487,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.6.0"></script>
+    <script type="module" src="./src/app.js?v=0.6.1"></script>
   </body>
 </html>

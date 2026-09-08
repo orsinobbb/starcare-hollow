@@ -12,6 +12,7 @@ export function createExpeditionController({ root = document, townController, on
 
   let state = townController.snapshot().expedition ?? createExpeditionState();
   let selectedTile = { x: 1, y: 0 };
+  let isAnimating = false;
   const ui = {
     view: element("#expedition-view"),
     focus: element("#expedition-focus"),
@@ -23,7 +24,9 @@ export function createExpeditionController({ root = document, townController, on
     selectedDetail: element("#expedition-selected-detail"),
     dig: element("#expedition-dig"),
     log: element("#expedition-log"),
-    compass: element("#expedition-compass")
+    compass: element("#expedition-compass"),
+    stage: element("#expedition-stage"),
+    controls: element("#expedition-map-controls")
   };
 
   const renderer = new ExpeditionRenderer(canvas, {
@@ -31,8 +34,25 @@ export function createExpeditionController({ root = document, townController, on
     onFocusTile: (tile) => {
       selectedTile = tile;
       renderSelection();
+    },
+    onStage: ({ stage, event }) => {
+      const stageCopy = {
+        aim: ["⌁", "先讓鏟尖定位，準備翻開這一格。"],
+        impact: ["✦", "鏟尖落下，地層正在鬆動。"],
+        reveal: ["◌", `正在翻開${event.terrain.name}，請看清楚地表回應。`],
+        discovery: ["✧", `星光浮現：${event.discovery?.name ?? "遺物"} 正在顯影！`],
+        settle: ["✓", "地層穩定中，遠征成果即將收下。"]
+      };
+      const [icon, text] = stageCopy[stage] ?? ["⌁", "遠征進行中。"];
+      updateStage(stage, icon, text);
     }
   });
+
+  function updateStage(stage, icon, text) {
+    if (!ui.stage) return;
+    ui.stage.dataset.stage = stage;
+    ui.stage.innerHTML = `<span aria-hidden="true">${icon}</span><p>${text}</p>`;
+  }
 
   function selectedTerrain() {
     return terrainAt(state, selectedTile.x, selectedTile.y);
@@ -44,14 +64,20 @@ export function createExpeditionController({ root = document, townController, on
     const permission = canExcavate(state, selectedTile.x, selectedTile.y);
     if (ui.selected) ui.selected.textContent = `座標 ${selectedTile.x + 1} · ${selectedTile.y + 1}`;
     if (ui.selectedDetail) {
-      ui.selectedDetail.textContent = permission.ok
+      ui.selectedDetail.textContent = isAnimating
+        ? `${terrain.name} 正在翻開；成果即將在地圖上顯現。`
+        : permission.ok
         ? `${terrain.name} · 調查消耗 ${terrain.cost} 專注`
         : permission.message;
     }
     if (ui.dig) {
-      ui.dig.disabled = !permission.ok;
-      ui.dig.textContent = permission.ok ? `調查 ${terrain.name}（-${terrain.cost}）` : "此格目前不能調查";
+      ui.dig.disabled = isAnimating || !permission.ok;
+      ui.dig.textContent = isAnimating ? "正在翻開地層…" : permission.ok ? `調查 ${terrain.name}（-${terrain.cost}）` : "此格目前不能調查";
     }
+    if (ui.controls) {
+      for (const button of ui.controls.querySelectorAll("button")) button.disabled = isAnimating;
+    }
+    canvas.setAttribute("aria-busy", String(isAnimating));
   }
 
   function render() {
@@ -67,7 +93,8 @@ export function createExpeditionController({ root = document, townController, on
     renderSelection();
   }
 
-  function attemptExcavate(x, y) {
+  async function attemptExcavate(x, y) {
+    if (isAnimating) return { ok: false, state, message: "正在完成這一格的挖掘演出。", event: null };
     const result = excavate(state, x, y);
     if (!result.ok) {
       if (ui.log) ui.log.textContent = result.message;
@@ -76,18 +103,31 @@ export function createExpeditionController({ root = document, townController, on
       return result;
     }
 
+    isAnimating = true;
     state = result.state;
     selectedTile = { x, y };
+    renderer.setState(state);
+    renderSelection();
+    updateStage("aim", "⌁", "鏟尖正在定位；這次翻開會先呈現完整的地層反應。");
+    if (ui.log) ui.log.textContent = `準備調查座標 ${x + 1} · ${y + 1}…`;
+    await renderer.playExcavation({ x, y }, result.event);
+
     const townResult = townController.recordExpedition(state, { ...result.event, message: result.message });
     state = townResult.state.expedition;
-    if (ui.log) ui.log.textContent = result.message;
+    isAnimating = false;
     render();
-    renderer.celebrate({ x, y }, result.event.type);
-    if (result.event.completed) onNotify("星砂群島的主要寶物已全數找回；地圖與收藏都會永久保留。", 3200);
+    if (ui.log) ui.log.textContent = result.message;
+    updateStage("complete", result.event.type === "discovery" ? "✧" : "✓", result.event.type === "discovery"
+      ? `已收下「${result.event.discovery.name}」；它已記入星願手札。`
+      : `${result.event.terrain.name} 已保存，羅盤也已更新。`);
+    onNotify(result.event.completed
+      ? "星砂群島的主要寶物已全數找回；地圖與收藏都會永久保留。"
+      : result.message, result.event.type === "discovery" ? 3200 : 1800);
     return result;
   }
 
   function moveSelection(dx, dy) {
+    if (isAnimating) return;
     selectedTile = {
       x: clamp(selectedTile.x + dx, 0, state.width - 1),
       y: clamp(selectedTile.y + dy, 0, state.height - 1)
@@ -103,7 +143,13 @@ export function createExpeditionController({ root = document, townController, on
     const [dx, dy] = button.dataset.expeditionMove.split(",").map(Number);
     moveSelection(dx, dy);
   });
-  element("#expedition-return")?.addEventListener("click", onLeave);
+  element("#expedition-return")?.addEventListener("click", () => {
+    if (isAnimating) {
+      onNotify("請先讓這一鏟的結果完整顯現。");
+      return;
+    }
+    onLeave();
+  });
 
   render();
 

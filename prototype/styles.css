@@ -3679,6 +3679,84 @@ body.is-board-dragging {
   cursor: grabbing;
 }
 
+.expedition-stage {
+  display: grid;
+  grid-template-columns: 2.15rem minmax(0, 1fr);
+  gap: 0.58rem;
+  align-items: center;
+  min-height: 3.35rem;
+  padding: 0.58rem 0.7rem;
+  margin-top: 0.65rem;
+  color: #e9f3ff;
+  background: linear-gradient(105deg, rgba(114, 214, 191, 0.14), rgba(255, 218, 127, 0.1));
+  border: 1px solid rgba(166, 234, 214, 0.3);
+  border-radius: 12px;
+}
+
+.expedition-stage > span {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  color: #fff0ac;
+  font-size: 1.15rem;
+  background: rgba(255, 232, 151, 0.1);
+  border: 1px solid rgba(255, 231, 145, 0.25);
+  border-radius: 50%;
+}
+
+.expedition-stage > p {
+  margin: 0;
+  color: #dce9f4;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.expedition-stage[data-stage="aim"] > span {
+  animation: expedition-stage-aim 0.62s ease-in-out infinite alternate;
+}
+
+.expedition-stage[data-stage="impact"] > span {
+  animation: expedition-stage-impact 0.18s ease-out 2;
+}
+
+.expedition-stage[data-stage="reveal"] > span {
+  color: #d6f6b0;
+  animation: expedition-stage-reveal 0.42s ease-in-out infinite alternate;
+}
+
+.expedition-stage[data-stage="discovery"] > span {
+  color: #fff4bb;
+  animation: expedition-stage-discovery 0.7s ease-in-out infinite alternate;
+}
+
+.expedition-stage[data-stage="complete"] > span {
+  color: #d9ffd2;
+  background: rgba(138, 227, 155, 0.15);
+  border-color: rgba(157, 241, 169, 0.38);
+}
+
+@keyframes expedition-stage-aim {
+  from { transform: translateY(-1px); }
+  to { transform: translateY(2px); }
+}
+
+@keyframes expedition-stage-impact {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(-3px); }
+  70% { transform: translateX(3px); }
+}
+
+@keyframes expedition-stage-reveal {
+  from { box-shadow: 0 0 0 rgba(183, 246, 152, 0); }
+  to { box-shadow: 0 0 18px rgba(183, 246, 152, 0.38); }
+}
+
+@keyframes expedition-stage-discovery {
+  from { transform: scale(0.95) rotate(-5deg); box-shadow: 0 0 0 rgba(255, 231, 139, 0); }
+  to { transform: scale(1.08) rotate(5deg); box-shadow: 0 0 22px rgba(255, 231, 139, 0.62); }
+}
+
 .expedition-map-help,
 .expedition-log {
   margin: 0.65rem 0 0;
@@ -3862,7 +3940,8 @@ body.is-board-dragging {
 
 @media (prefers-reduced-motion: reduce) {
   #expedition-canvas,
-  .compass-ring {
+  .compass-ring,
+  .expedition-stage > span {
     scroll-behavior: auto;
     transition: none;
     animation: none;
