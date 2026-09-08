@@ -1,11 +1,13 @@
 import { APP_VERSION, SAVE_SCHEMA_VERSION } from "./version.js";
-import { createExpeditionState, normalizeExpeditionState } from "./expedition-engine.js";
+import { EXPEDITION_FOCUS_MAX, createExpeditionState, normalizeExpeditionState } from "./expedition-engine.js";
 
 export const TOWN_SAVE_KEY = "starcare-hollow:town:v1";
 export const TOWN_BACKUP_KEY = "starcare-hollow:town:backup";
 export const TOWN_SCHEMA_VERSION = SAVE_SCHEMA_VERSION;
 export const TOWN_GAME_VERSION = APP_VERSION;
 export const DISTRICT_RESTORATION_GOAL = 30;
+export const EXPEDITION_FOCUS_RESTORE = 6;
+export const EXPEDITION_FOCUS_MOONLEAF_COST = 1;
 
 export const RESOURCE_LABELS = {
   coins: "星幣",
@@ -31,7 +33,7 @@ export const BUILDINGS = {
       2: { coins: 90, timber: 2 },
       3: { coins: 180, timber: 4, starlight: 3 }
     },
-    benefit: (level) => `每日可採收 ${level + 2} 片月芽葉`
+    benefit: (level) => `每日採收 ${level + 2} 片月芽葉・遠征暖茶補給`
   },
   workshop: {
     name: "回響工坊",
@@ -376,6 +378,28 @@ export function fulfillCommission(state) {
   });
 }
 
+export function resupplyExpeditionFocus(state) {
+  const focus = state.expedition?.focus ?? 0;
+  if (focus >= EXPEDITION_FOCUS_MAX) {
+    return outcome(state, false, "羅盤專注已充足；先把月芽葉留給下一段路。");
+  }
+  if (state.resources.moonleaf < EXPEDITION_FOCUS_MOONLEAF_COST) {
+    return outcome(state, false, "需要 1 片月芽葉。到小鎮的月芽藥園採收；若今天已採收，完成星願並前往明日。");
+  }
+
+  const next = clone(state);
+  const restored = Math.min(EXPEDITION_FOCUS_RESTORE, EXPEDITION_FOCUS_MAX - focus);
+  next.resources.moonleaf -= EXPEDITION_FOCUS_MOONLEAF_COST;
+  next.expedition = normalizeExpeditionState({
+    ...next.expedition,
+    focus: focus + restored
+  });
+  return collectionOutcome(state, next, `月芽暖茶回到羅盤：遠征專注 +${restored}。`, {
+    moonleaf: -EXPEDITION_FOCUS_MOONLEAF_COST,
+    expeditionFocus: restored
+  });
+}
+
 export function recordClinicShift(state, {
   id,
   completed,
@@ -694,6 +718,7 @@ export function createTownController({ root = document, storage = globalThis.loc
     render,
     snapshot: () => clone(state),
     recordShift: (summary) => commit(recordClinicShift(state, summary)),
-    recordExpedition: (expedition, event) => commit(recordExpeditionProgress(state, expedition, event))
+    recordExpedition: (expedition, event) => commit(recordExpeditionProgress(state, expedition, event)),
+    resupplyExpeditionFocus: () => commit(resupplyExpeditionFocus(state))
   };
 }

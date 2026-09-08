@@ -2,14 +2,14 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#18243f" />
     <meta
       name="description"
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.6.0" />
+    <link rel="stylesheet" href="./styles.css?v=0.6.2" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.6.1</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.6.2</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -155,7 +155,7 @@
                     <span class="level-chip" data-building-level="garden">Lv.1</span>
                   </div>
                   <p>每日照料一次，不枯萎、不追現實時間；藥草能直接供應居民。</p>
-                  <p class="building-benefit" data-building-benefit="garden">每日可採收 3 片月芽葉</p>
+                  <p class="building-benefit" data-building-benefit="garden">每日採收 3 片月芽葉・遠征暖茶補給</p>
                   <div class="building-actions">
                     <button id="garden-action" class="primary-button compact" type="button">採收 3 片月芽葉</button>
                     <button class="secondary-button compact" data-upgrade-building="garden" type="button">升級 Lv.2</button>
@@ -247,7 +247,7 @@
             <div>
               <p class="eyebrow">星砂群島 · 可玩技術切片</p>
               <h2 id="expedition-title">星脈遠征</h2>
-              <p>點已開啟格旁邊的迷霧調查；每次翻開地表後，羅盤會提示下一件主要寶物有多近。</p>
+              <p>點已開啟格旁邊的迷霧調查；每次翻開地表後，羅盤會提示下一件主要寶物有多近。專注不足時，用小鎮藥園採收的月芽葉補給。</p>
             </div>
             <button id="expedition-return" class="secondary-button" type="button">帶著成果回小鎮</button>
           </section>
@@ -266,7 +266,7 @@
                 <span aria-hidden="true">⌁</span>
                 <p>每一次調查都會先呈現定位、翻土與地表回應。</p>
               </div>
-              <p id="expedition-map-help" class="expedition-map-help">地圖內：單指拖曳移動鏡頭，輕點相鄰迷霧格調查。鍵盤可用方向鍵選格、Enter 調查；地圖外仍可正常捲動與縮放。</p>
+              <p id="expedition-map-help" class="expedition-map-help">地圖內：單指拖曳移動鏡頭，輕點相鄰迷霧格調查。鍵盤可用方向鍵選格、Enter 調查。遊戲採固定比例，雙指不會改變世界或按鈕位置。</p>
               <p id="expedition-log" class="expedition-log" role="status" aria-live="polite">羅盤待命：從起點相鄰的格子開始調查。</p>
             </section>
 
@@ -276,6 +276,14 @@
                 <h3 id="compass-title"><span id="expedition-clue-title">羅盤待命</span></h3>
                 <p id="expedition-clue-detail">從起點相鄰的格子開始調查。</p>
                 <span class="compass-ring" aria-hidden="true">✦</span>
+              </section>
+
+              <section class="expedition-supply-card" aria-labelledby="expedition-supply-title">
+                <p class="eyebrow">遠征補給</p>
+                <h3 id="expedition-supply-title">月芽暖茶</h3>
+                <p id="expedition-supply-detail">月芽葉來自小鎮的月芽藥園；每片可讓羅盤回復 6 點專注。</p>
+                <button id="expedition-resupply" class="secondary-button compact" type="button">飲用月芽暖茶（-1 月芽葉，+6 專注）</button>
+                <small id="expedition-supply-source" class="expedition-supply-source">先回小鎮的月芽藥園採收，或完成星願後進入下一日。</small>
               </section>
 
               <section class="excavation-card" aria-labelledby="selected-title">
@@ -294,7 +302,7 @@
                 <strong>安心探索</strong>
                 <ul>
                   <li>已翻開地格與找到的寶物永久保存。</li>
-                  <li>專注不足只代表可先返回，不會沒收成果。</li>
+                  <li>專注不足時用月芽暖茶補給；月芽葉來自小鎮藥園。</li>
                   <li>每次挖掘都先顯示翻土與回饋，再更新狀態。</li>
                 </ul>
               </section>
@@ -487,6 +495,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.6.1"></script>
+    <script type="module" src="./src/app.js?v=0.6.2"></script>
   </body>
 </html>

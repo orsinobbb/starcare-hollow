@@ -3593,7 +3593,7 @@ body.is-board-dragging {
   }
 }
 
-/* v0.6 星脈遠征：Canvas 只處理地圖，頁面其餘區域保持原生可縮放與捲動。 */
+/* 星脈遠征：遊戲採固定比例；Canvas 只處理單指地圖操作，頁面仍可正常捲動。 */
 .expedition-hud {
   grid-template-columns: repeat(3, minmax(100px, 1fr));
 }
@@ -3783,6 +3783,7 @@ body.is-board-dragging {
 }
 
 .compass-card,
+.expedition-supply-card,
 .excavation-card,
 .expedition-principles {
   position: relative;
@@ -3791,6 +3792,7 @@ body.is-board-dragging {
 }
 
 .compass-card h3,
+.expedition-supply-card h3,
 .excavation-card h3 {
   margin-bottom: 0.35rem;
   font-family: Georgia, "Noto Serif TC", serif;
@@ -3798,6 +3800,7 @@ body.is-board-dragging {
 }
 
 .compass-card > p:not(.eyebrow),
+.expedition-supply-card > p,
 .excavation-card > p {
   position: relative;
   z-index: 1;
@@ -3843,6 +3846,25 @@ body.is-board-dragging {
 .excavation-card > .primary-button {
   width: 100%;
   margin-top: 0.8rem;
+}
+
+.expedition-supply-card {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(173, 237, 156, 0.18), transparent 11rem),
+    linear-gradient(145deg, rgba(30, 66, 69, 0.94), rgba(20, 39, 59, 0.98));
+}
+
+.expedition-supply-card > .secondary-button {
+  width: 100%;
+  margin-top: 0.8rem;
+}
+
+.expedition-supply-source {
+  display: block;
+  margin-top: 0.68rem;
+  color: #b9d9c0;
+  font-size: 0.7rem;
+  line-height: 1.45;
 }
 
 .expedition-map-controls {
@@ -3907,6 +3929,10 @@ body.is-board-dragging {
 
   .expedition-principles {
     grid-column: 1 / -1;
+  }
+
+  .expedition-supply-card {
+    grid-column: auto;
   }
 }
 

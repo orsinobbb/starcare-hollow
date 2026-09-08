@@ -79,12 +79,13 @@ test("clinic uses ordinary buttons so the page remains scrollable on touch scree
   assert.doesNotMatch(app, /pointerdown|pointermove|touchmove|preventDefault/);
 });
 
-test("zoom reflows without disabling accessibility and matches celebrate before removal", async () => {
+test("the game keeps a stable viewport and successful pairs celebrate without blocking the next choice", async () => {
   const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
   const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
   const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
 
-  assert.doesNotMatch(html, /user-scalable\s*=\s*no|maximum-scale\s*=\s*1/);
+  assert.match(html, /maximum-scale=1/);
+  assert.match(html, /user-scalable=no/);
   assert.match(css, /container-type:\s*inline-size/);
   assert.match(css, /@container\s*\(max-width:\s*360px\)/);
   assert.match(css, /minmax\(44px,\s*1fr\)/);
@@ -92,8 +93,9 @@ test("zoom reflows without disabling accessibility and matches celebrate before 
   assert.match(css, /@keyframes\s+matched-card-exit/);
   assert.match(css, /prefers-reduced-motion[\s\S]*\.match-card\.is-match-success/);
   assert.match(app, /MATCH_CELEBRATION_SECONDS/);
-  assert.match(app, /beginPairCelebration/);
-  assert.match(app, /配對成功：/);
+  assert.match(app, /successCelebrations/);
+  assert.match(app, /beginSuccessCelebration/);
+  assert.match(app, /你可以繼續找下一組/);
 });
 
 test("the expedition ships a mobile canvas surface with isolated gestures and deterministic state", async () => {
@@ -108,6 +110,7 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(html, /id="expedition-canvas"[^>]*tabindex="0"/);
   assert.match(html, /id="expedition-stage"[^>]*role="status"/);
   assert.match(html, /id="expedition-map-help"/);
+  assert.match(html, /id="expedition-resupply"/);
   assert.match(css, /#expedition-canvas[\s\S]*touch-action:\s*none/);
   assert.match(css, /#expedition-canvas[\s\S]*height:\s*clamp/);
   assert.match(app, /createExpeditionController/);
@@ -123,6 +126,8 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(css, /prefers-reduced-motion[\s\S]*\.expedition-stage > span/);
   assert.match(controller, /isAnimating/);
   assert.match(controller, /await renderer\.playExcavation/);
+  assert.match(controller, /resupplyExpeditionFocus/);
+  assert.match(controller, /月芽暖茶/);
   assert.match(expedition, /createExpeditionState/);
   assert.match(expedition, /compassClue/);
 });

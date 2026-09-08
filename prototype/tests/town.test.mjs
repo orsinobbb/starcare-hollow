@@ -6,6 +6,7 @@ import {
   TOWN_BACKUP_KEY,
   TOWN_SAVE_KEY,
   TOWN_SCHEMA_VERSION,
+  EXPEDITION_FOCUS_RESTORE,
   advanceTownDay,
   claimDailyReward,
   createTownState,
@@ -13,6 +14,7 @@ import {
   loadTownState,
   recordClinicShift,
   recordExpeditionProgress,
+  resupplyExpeditionFocus,
   saveTownState,
   tendGarden,
   upgradeBuilding
@@ -56,6 +58,26 @@ test("the garden can be harvested only once each town day", () => {
   assert.equal(first.state.resources.moonleaf, 4);
   assert.equal(first.state.daily.garden, true);
   assert.equal(tendGarden(first.state).ok, false);
+});
+
+test("moonleaf tea visibly closes the garden-to-expedition focus loop", () => {
+  const depleted = createTownState();
+  depleted.resources.moonleaf = 1;
+  depleted.expedition.focus = 24;
+
+  const supplied = resupplyExpeditionFocus(depleted);
+  assert.equal(supplied.ok, true);
+  assert.equal(supplied.state.resources.moonleaf, 0);
+  assert.equal(supplied.state.expedition.focus, 24 + EXPEDITION_FOCUS_RESTORE);
+  assert.equal(supplied.delta.expeditionFocus, EXPEDITION_FOCUS_RESTORE);
+  assert.equal(depleted.expedition.focus, 24, "the original town snapshot stays immutable");
+  assert.equal(resupplyExpeditionFocus(supplied.state).ok, false, "a missing leaf explains the next intended action");
+
+  const almostFull = createTownState();
+  almostFull.expedition.focus = 28;
+  const capped = resupplyExpeditionFocus(almostFull);
+  assert.equal(capped.state.expedition.focus, 30);
+  assert.equal(capped.delta.expeditionFocus, 2, "the final tea never overfills the focus meter");
 });
 
 test("a resident commission spends leaves and feeds the shared economy", () => {

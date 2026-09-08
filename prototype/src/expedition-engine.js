@@ -195,7 +195,7 @@ export function canExcavate(state, x, y) {
   if (isRevealed(state, x, y)) return { ok: false, message: "這一格已經調查過了。" };
   if (!isAdjacentToRevealed(state, x, y)) return { ok: false, message: "只能從已開啟格的上下左右繼續探索。" };
   const terrain = terrainAt(state, x, y);
-  if (state.focus < terrain.cost) return { ok: false, message: `調查${terrain.name}需要 ${terrain.cost} 點專注，目前專注不足。` };
+  if (state.focus < terrain.cost) return { ok: false, reason: "focus", message: `調查${terrain.name}需要 ${terrain.cost} 點專注，目前專注不足。` };
   return { ok: true, terrain };
 }
 

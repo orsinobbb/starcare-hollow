@@ -115,8 +115,8 @@ function createInitialState(status = "briefing", choices = {}) {
     secondCardId: null,
     locked: false,
     compareRemaining: 0,
-    matchCelebrationRemaining: 0,
-    celebratingIds: [],
+    successCelebrations: [],
+    completeAfterCelebration: false,
     previewRemaining: 0,
     revealRemaining: 0,
     hintIds: [],
@@ -280,8 +280,8 @@ function setupRound() {
   state.secondCardId = null;
   state.locked = false;
   state.compareRemaining = 0;
-  state.matchCelebrationRemaining = 0;
-  state.celebratingIds = [];
+  state.successCelebrations = [];
+  state.completeAfterCelebration = false;
   state.previewRemaining = state.currentMode === "memory" ? DIFFICULTIES[state.difficulty].preview : 0;
   state.revealRemaining = 0;
   state.hintIds = [];
@@ -299,10 +299,15 @@ function visibleCards() {
   return state.cards.filter((card) => card.state !== "matched" && card.state !== "in-tray");
 }
 
+function isCardCelebrating(cardId) {
+  return state.successCelebrations.some((celebration) => celebration.ids.includes(cardId));
+}
+
 function cardIsFaceUp(card) {
   if (state.currentMode !== "memory") return true;
   return state.previewRemaining > 0
     || state.revealRemaining > 0
+    || isCardCelebrating(card.id)
     || card.id === state.firstCardId
     || card.id === state.secondCardId;
 }
@@ -339,25 +344,32 @@ function awardMatch(groupSize, label = "配對成功") {
   playMatchSound(state.combo);
 }
 
-function beginPairCelebration(cards, label) {
-  state.celebratingIds = cards.map((card) => card.id);
-  state.matchCelebrationRemaining = MATCH_CELEBRATION_SECONDS;
-  state.locked = true;
-  awardMatch(2, label);
-  announce(`${label}！確認完成後卡片會化成星光。`);
-}
-
-function finishPairCelebration() {
-  for (const cardId of state.celebratingIds) {
-    const card = cardById(cardId);
-    if (card) card.state = "matched";
-  }
-  state.celebratingIds = [];
+function beginSuccessCelebration(cards, label, groupSize) {
+  for (const card of cards) card.state = "matched";
+  state.successCelebrations.push({
+    ids: cards.map((card) => card.id),
+    remaining: MATCH_CELEBRATION_SECONDS
+  });
   state.firstCardId = null;
   state.secondCardId = null;
   state.locked = false;
-  completeRoundIfNeeded();
-  renderAll();
+  awardMatch(groupSize, label);
+  announce(`${label}！這組正在化成星光；你可以繼續找下一組。`);
+  if (boardIsComplete()) state.completeAfterCelebration = true;
+}
+
+function tickSuccessCelebrations(delta) {
+  if (!state.successCelebrations.length) return;
+  const previousCount = state.successCelebrations.length;
+  state.successCelebrations = state.successCelebrations
+    .map((celebration) => ({ ...celebration, remaining: Math.max(0, celebration.remaining - delta) }))
+    .filter((celebration) => celebration.remaining > 0);
+
+  if (state.successCelebrations.length !== previousCount) renderBoard();
+  if (state.completeAfterCelebration && state.successCelebrations.length === 0) {
+    state.completeAfterCelebration = false;
+    completeRoundIfNeeded();
+  }
 }
 
 function boardIsComplete() {
@@ -390,13 +402,13 @@ function handlePairCard(card) {
   if (state.firstCardId === card.id) return;
   const first = cardById(state.firstCardId);
   state.secondCardId = card.id;
-  state.locked = true;
 
   if (isMatchingGroup([first, card], 2)) {
-    beginPairCelebration([first, card], `${card.name}找到同伴`);
+    beginSuccessCelebration([first, card], `${card.name}找到同伴`, 2);
     return;
   }
 
+  state.locked = true;
   applyMistake(`${first.name}和${card.name}不是同一組`);
   state.compareRemaining = state.currentMode === "memory" ? 0.72 : 0.42;
 }
@@ -408,12 +420,8 @@ function handleTripleCard(card) {
   state.tray = result.tray;
 
   if (result.clearedFamilyId) {
-    for (const id of result.clearedIds) {
-      const cleared = cardById(id);
-      if (cleared) cleared.state = "matched";
-    }
-    awardMatch(3, `${card.name}完成三件收納`);
-    completeRoundIfNeeded();
+    const clearedCards = result.clearedIds.map(cardById).filter(Boolean);
+    beginSuccessCelebration(clearedCards, `${card.name}完成三件收納`, 3);
     return;
   }
 
@@ -448,17 +456,11 @@ function autoCompleteGroup() {
     state.firstCardId = cards[0]?.id ?? null;
     state.secondCardId = cards[1]?.id ?? null;
     state.compareRemaining = 0;
-    beginPairCelebration(cards, "星引完成一組");
+    beginSuccessCelebration(cards, "星引完成一組", 2);
     return true;
   }
-  for (const card of cards) card.state = "matched";
   state.tray = state.tray.filter((card) => !ids.includes(card.id));
-  state.firstCardId = null;
-  state.secondCardId = null;
-  state.compareRemaining = 0;
-  state.locked = false;
-  awardMatch(groupSize, "星引完成一組");
-  completeRoundIfNeeded();
+  beginSuccessCelebration(cards, "星引完成一組", groupSize);
   return true;
 }
 
@@ -522,10 +524,7 @@ function tick(delta) {
     if (previous > 0 && state.revealRemaining === 0) renderBoard();
   }
 
-  if (state.matchCelebrationRemaining > 0) {
-    state.matchCelebrationRemaining = Math.max(0, state.matchCelebrationRemaining - delta);
-    if (state.matchCelebrationRemaining === 0) finishPairCelebration();
-  }
+  tickSuccessCelebrations(delta);
 
   if (state.transitionRemaining > 0) {
     state.transitionRemaining = Math.max(0, state.transitionRemaining - delta);
@@ -734,9 +733,9 @@ function renderBoard() {
   for (const card of state.cards) {
     const button = document.createElement("button");
     const faceUp = cardIsFaceUp(card);
-    const removed = card.state === "matched" || card.state === "in-tray";
+    const celebrating = isCardCelebrating(card.id);
+    const removed = (card.state === "matched" || card.state === "in-tray") && !celebrating;
     const selected = card.id === state.firstCardId || card.id === state.secondCardId;
-    const celebrating = state.celebratingIds.includes(card.id) && state.matchCelebrationRemaining > 0;
     const hinted = state.hintIds.includes(card.id) && state.hintRemaining > 0;
     button.type = "button";
     button.dataset.cardId = card.id;
