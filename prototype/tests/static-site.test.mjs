@@ -48,26 +48,31 @@ test("town shell, controller, and versioned save contract ship together", async 
   assert.match(TOWN_SAVE_KEY, /:v1$/);
 });
 
-test("clinic ships resident selection, station dispatch, and player-chosen skills", async () => {
+test("game house ships three short-game modes and player-chosen skills", async () => {
   const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
   const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
   const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
 
-  assert.match(html, /id="patient-list"/);
-  assert.match(html, /id="selected-visit"/);
-  assert.match(html, /id="station-list"/);
+  assert.match(html, /id="game-board"/);
+  assert.match(html, /id="collection-tray"/);
+  assert.match(html, /name="game-mode" value="memory"/);
+  assert.match(html, /name="game-mode" value="quick-pair"/);
+  assert.match(html, /name="game-mode" value="triple-pack"/);
   assert.match(html, /id="skill-list"/);
   assert.doesNotMatch(html, /id="task-board"/);
-  assert.match(css, /\.care-workspace/);
-  assert.match(css, /\.station-action/);
+  assert.doesNotMatch(html, /id="patient-list"|id="station-list"/);
+  assert.match(css, /\.minigame-workspace/);
+  assert.match(css, /\.match-card/);
+  assert.match(css, /\.collection-tray/);
   assert.match(css, /\.skill-card\.is-ready/);
-  assert.match(app, /function serviceSelectedPatient/);
+  assert.match(app, /function handleCard/);
+  assert.match(app, /function handleTripleCard/);
   assert.match(app, /function activateSkill/);
 });
 
 test("clinic uses ordinary buttons so the page remains scrollable on touch screens", async () => {
   const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
-  assert.match(app, /data-station-type/);
+  assert.match(app, /data-card-id/);
   assert.match(app, /data-skill-id/);
   assert.doesNotMatch(app, /pointerdown|pointermove|touchmove|preventDefault/);
 });

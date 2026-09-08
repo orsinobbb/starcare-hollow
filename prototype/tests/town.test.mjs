@@ -35,7 +35,7 @@ test("town actions unlock permanent collectibles rather than only currencies", (
   assert.deepEqual(commission.delta.collectionIds, ["tobis-whistle"]);
   state = commission.state;
 
-  const shift = recordClinicShift(state, { id: "collection-shift", served: 1, stars: 1, skillUses: 1 });
+  const shift = recordClinicShift(state, { id: "collection-shift", completed: 1, matched: 4, stars: 1, skillUses: 1 });
   assert.deepEqual(shift.delta.collectionIds, ["clinic-badge", "companion-charm"]);
   state = shift.state;
 
@@ -66,14 +66,15 @@ test("a resident commission spends leaves and feeds the shared economy", () => {
   assert.equal(delivered.state.daily.commission, true);
 });
 
-test("a clinic shift rewards the town exactly once", () => {
+test("a mini-game session rewards the town exactly once", () => {
   const state = createTownState();
-  const first = recordClinicShift(state, { id: "shift-a", served: 3, stars: 2, score: 900 });
-  const duplicate = recordClinicShift(first.state, { id: "shift-a", served: 3, stars: 2, score: 900 });
+  const first = recordClinicShift(state, { id: "shift-a", completed: 3, matched: 15, stars: 2, score: 900 });
+  const duplicate = recordClinicShift(first.state, { id: "shift-a", completed: 3, matched: 15, stars: 2, score: 900 });
   assert.equal(first.ok, true);
   assert.equal(first.state.daily.clinic, true);
-  assert.equal(first.delta.coins, 44);
+  assert.equal(first.delta.coins, 62);
   assert.equal(first.delta.starlight, 1);
+  assert.equal(first.state.lifetime.pairsMatched, 15);
   assert.equal(duplicate.ok, false);
   assert.deepEqual(duplicate.state.resources, first.state.resources);
 });
@@ -81,7 +82,8 @@ test("a clinic shift rewards the town exactly once", () => {
 test("using a companion skill becomes permanent collection progress", () => {
   const result = recordClinicShift(createTownState(), {
     id: "skill-shift",
-    served: 1,
+    completed: 1,
+    matched: 4,
     stars: 1,
     skillUses: 2
   });
@@ -93,7 +95,7 @@ test("using a companion skill becomes permanent collection progress", () => {
 test("three daily wishes unlock a reward and the next player-controlled day", () => {
   let state = tendGarden(createTownState()).state;
   state = fulfillCommission(state).state;
-  state = recordClinicShift(state, { id: "shift-day-one", served: 1, stars: 1 }).state;
+  state = recordClinicShift(state, { id: "shift-day-one", completed: 1, matched: 4, stars: 1 }).state;
 
   const reward = claimDailyReward(state);
   assert.equal(reward.ok, true);
@@ -142,6 +144,7 @@ test("schema v1 saves migrate without losing progress and infer collectibles", (
   legacy.lifetime.shifts = 2;
   delete legacy.lifetime.dailyRewards;
   delete legacy.lifetime.skillUses;
+  delete legacy.lifetime.pairsMatched;
   delete legacy.collections;
 
   const payload = JSON.stringify({ schemaVersion: 1, gameVersion: "0.2.0", profile: legacy });
@@ -152,6 +155,7 @@ test("schema v1 saves migrate without losing progress and infer collectibles", (
   assert.equal(migrated.restoration, 12);
   assert.equal(migrated.lifetime.dailyRewards, 0);
   assert.equal(migrated.lifetime.skillUses, 0);
+  assert.equal(migrated.lifetime.pairsMatched, 0);
   assert.ok(migrated.collections.unlocked.includes("moonleaf-pressing"));
   assert.ok(migrated.collections.unlocked.includes("clinic-badge"));
   assert.ok(migrated.collections.unlocked.includes("lantern-keepsake"));

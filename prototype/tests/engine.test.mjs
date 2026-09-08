@@ -2,73 +2,101 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  CARD_FAMILIES,
+  MINI_GAME_MODES,
   SKILL_CHARGE_MAX,
-  TASK_IDS,
   addSkillCharge,
-  advanceCooldowns,
+  createPairDeck,
   createRng,
+  createTripleDeck,
+  findAvailableGroup,
   formatTime,
-  jobUrgency,
-  nextCareFlow,
-  resolveService,
-  selectServiceJob,
-  shuffledIndexes
+  insertTrayCard,
+  isMatchingGroup,
+  modeForRound,
+  nextCombo,
+  resolveTray,
+  scoreForMatch,
+  shuffle
 } from "../src/engine.js";
 
-test("seeded visitor order is deterministic and complete", () => {
-  const first = shuffledIndexes(8, createRng("same-town"));
-  const second = shuffledIndexes(8, createRng("same-town"));
+test("seeded shuffles are deterministic without losing entries", () => {
+  const source = [1, 2, 3, 4, 5, 6];
+  const first = shuffle(source, createRng("same-town"));
+  const second = shuffle(source, createRng("same-town"));
   assert.deepEqual(first, second);
-  assert.deepEqual([...first].sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual([...first].sort((a, b) => a - b), source);
+  assert.deepEqual(source, [1, 2, 3, 4, 5, 6]);
 });
 
-test("a selected resident keeps priority at the matching station", () => {
-  const jobs = [
-    { id: "a", patientId: "patient-a", type: "care", age: 8, deadline: 10, remaining: 4 },
-    { id: "b", patientId: "patient-b", type: "care", age: 2, deadline: 10, remaining: 2 }
+test("pair deck contains exactly two of every selected cute character", () => {
+  const deck = createPairDeck(6, createRng("pair-test"));
+  assert.equal(deck.length, 12);
+  const counts = Object.groupBy(deck, (card) => card.familyId);
+  assert.equal(Object.keys(counts).length, 6);
+  assert.ok(Object.values(counts).every((cards) => cards.length === 2));
+  assert.ok(deck.every((card) => card.name && card.symbol && card.state === "idle"));
+});
+
+test("triple deck contains exactly three of every selected item", () => {
+  const deck = createTripleDeck(5, createRng("tray-test"));
+  assert.equal(deck.length, 15);
+  const counts = Object.groupBy(deck, (card) => card.familyId);
+  assert.equal(Object.keys(counts).length, 5);
+  assert.ok(Object.values(counts).every((cards) => cards.length === 3));
+  assert.ok(Object.keys(counts).every((id) => CARD_FAMILIES.some((family) => family.id === id)));
+});
+
+test("matching checks require the requested group size and family", () => {
+  const cloud = { familyId: "cloud" };
+  const moon = { familyId: "moon" };
+  assert.equal(isMatchingGroup([cloud, cloud], 2), true);
+  assert.equal(isMatchingGroup([cloud, moon], 2), false);
+  assert.equal(isMatchingGroup([cloud, cloud], 3), false);
+});
+
+test("available group ignores completed cards", () => {
+  const cards = [
+    { id: "a1", familyId: "a", state: "matched" },
+    { id: "a2", familyId: "a", state: "idle" },
+    { id: "b1", familyId: "b", state: "idle" },
+    { id: "b2", familyId: "b", state: "idle" }
   ];
-  assert.equal(selectServiceJob(jobs, "care", "patient-b")?.id, "b");
-  assert.equal(selectServiceJob(jobs, "brew", "patient-b"), null);
+  assert.deepEqual(findAvailableGroup(cards, 2), ["b1", "b2"]);
 });
 
-test("without a selected match, the most urgent resident is served", () => {
-  const jobs = [
-    { id: "calm", patientId: "a", type: "observe", age: 2, deadline: 10, remaining: 2 },
-    { id: "urgent", patientId: "b", type: "observe", age: 9, deadline: 10, remaining: 5 }
-  ];
-  assert.equal(selectServiceJob(jobs, "observe", "missing")?.id, "urgent");
+test("tray groups matching items together and clears a triple", () => {
+  const leaf1 = { id: "l1", familyId: "leaf" };
+  const leaf2 = { id: "l2", familyId: "leaf" };
+  const leaf3 = { id: "l3", familyId: "leaf" };
+  const star = { id: "s1", familyId: "star" };
+  let tray = insertTrayCard([leaf1, star], leaf2);
+  assert.deepEqual(tray.map((card) => card.id), ["l1", "l2", "s1"]);
+  tray = insertTrayCard(tray, leaf3);
+  const result = resolveTray(tray);
+  assert.equal(result.clearedFamilyId, "leaf");
+  assert.deepEqual(result.clearedIds, ["l1", "l2", "l3"]);
+  assert.deepEqual(result.tray.map((card) => card.id), ["s1"]);
 });
 
-test("service work completes without making remaining work negative", () => {
-  assert.deepEqual(resolveService({ remaining: 5 }, 3), { workDone: 3, remaining: 2, completed: false });
-  assert.deepEqual(resolveService({ remaining: 2 }, 3), { workDone: 2, remaining: 0, completed: true });
-  assert.deepEqual(resolveService({ remaining: 2 }, -4), { workDone: 0, remaining: 2, completed: false });
+test("rotation visits all mini-game modes in order and fixed choices stay fixed", () => {
+  assert.deepEqual([1, 2, 3, 4].map((round) => modeForRound("rotation", round)), [
+    "memory",
+    "quick-pair",
+    "triple-pack",
+    "memory"
+  ]);
+  assert.equal(modeForRound("quick-pair", 3), "quick-pair");
+  assert.equal(MINI_GAME_MODES.length, 3);
 });
 
-test("all station cooldowns advance safely", () => {
-  const result = advanceCooldowns({ observe: 1, brew: 0.2, care: 4, comfort: 0 }, 0.5);
-  assert.deepEqual(Object.keys(result), TASK_IDS);
-  assert.deepEqual(result, { observe: 0.5, brew: 0, care: 3.5, comfort: 0 });
-});
-
-test("care flow continues inside its window and resets outside it", () => {
-  assert.equal(nextCareFlow(3, 10, 14), 4);
-  assert.equal(nextCareFlow(3, 10, 16), 1);
-  assert.equal(nextCareFlow(0, null, 2), 1);
-});
-
-test("skill charge grows by correct services and caps at full", () => {
+test("combo, score, charge, and clock calculations are bounded", () => {
+  assert.equal(nextCombo(3, true), 4);
+  assert.equal(nextCombo(3, false), 0);
+  assert.ok(scoreForMatch(5, 3) > scoreForMatch(1, 2));
   assert.equal(addSkillCharge(0), 25);
-  assert.equal(addSkillCharge(75), SKILL_CHARGE_MAX);
-  assert.equal(addSkillCharge(95, 30), SKILL_CHARGE_MAX);
-  assert.equal(addSkillCharge(10, -10), 10);
-});
-
-test("urgency and clock formatting expose clear player-facing states", () => {
-  assert.equal(jobUrgency(4, 10), "calm");
-  assert.equal(jobUrgency(5, 10), "reminder");
-  assert.equal(jobUrgency(8, 10), "urgent");
-  assert.equal(jobUrgency(10, 10), "critical");
-  assert.equal(formatTime(180), "3:00");
+  assert.equal(addSkillCharge(90), SKILL_CHARGE_MAX);
+  assert.equal(addSkillCharge(10, -20), 10);
+  assert.equal(formatTime(120), "2:00");
   assert.equal(formatTime(9.1), "0:10");
 });

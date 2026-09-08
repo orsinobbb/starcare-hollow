@@ -15,13 +15,13 @@ export const RESOURCE_LABELS = {
 
 export const BUILDINGS = {
   clinic: {
-    name: "暖星療癒所",
+    name: "暖星小遊戲屋",
     maxLevel: 3,
     costs: {
       2: { coins: 120, moonleaf: 4 },
       3: { coins: 240, timber: 5, starlight: 4 }
     },
-    benefit: (level) => `每次值班額外獲得 ${Math.max(0, level - 1) * 8} 星幣`
+    benefit: (level) => `每場遊戲額外獲得 ${Math.max(0, level - 1) * 8} 星幣`
   },
   garden: {
     name: "月芽藥園",
@@ -46,7 +46,7 @@ export const BUILDINGS = {
 export const DAILY_WISHES = [
   { id: "garden", title: "照料月芽藥園", detail: "採收一次今日藥草" },
   { id: "commission", title: "完成居民委託", detail: "交付 3 片月芽葉" },
-  { id: "clinic", title: "守住療癒所", detail: "完成一個診療班次" }
+  { id: "clinic", title: "完成遊戲委託", detail: "完成一場小遊戲挑戰" }
 ];
 
 export const COLLECTION_ITEMS = Object.freeze([
@@ -77,10 +77,10 @@ export const COLLECTION_ITEMS = Object.freeze([
   {
     id: "clinic-badge",
     icon: "✚",
-    category: "療癒紀錄",
-    name: "暖星值班章",
-    detail: "不論成績高低，這枚章記得你守過的一次班。",
-    hint: "完成第一次療癒所值班"
+    category: "遊戲紀錄",
+    name: "暖星遊戲章",
+    detail: "不論成績高低，這枚章記得你完成的第一場委託。",
+    hint: "完成第一次小遊戲委託"
   },
   {
     id: "companion-charm",
@@ -88,7 +88,7 @@ export const COLLECTION_ITEMS = Object.freeze([
     category: "搭檔信物",
     name: "三心共鳴徽記",
     detail: "艾芙、賽恩與絨絨把第一次並肩施放技能的光留在這枚徽記裡。",
-    hint: "在療癒所第一次施放搭檔技能"
+    hint: "在小遊戲中第一次施放搭檔技能"
   },
   {
     id: "restorer-pin",
@@ -160,6 +160,7 @@ export function createTownState() {
     lifetime: {
       shifts: 0,
       served: 0,
+      pairsMatched: 0,
       harvests: 0,
       commissions: 0,
       upgrades: 0,
@@ -351,19 +352,28 @@ export function fulfillCommission(state) {
   });
 }
 
-export function recordClinicShift(state, { id, served = 0, stars = 0, score = 0, skillUses = 0 } = {}) {
+export function recordClinicShift(state, {
+  id,
+  completed,
+  matched = 0,
+  served = 0,
+  stars = 0,
+  score = 0,
+  skillUses = 0
+} = {}) {
   const shiftId = typeof id === "string" && id ? id : null;
-  if (!shiftId) return outcome(state, false, "這次班次缺少識別碼，沒有重複發放獎勵。");
+  if (!shiftId) return outcome(state, false, "這次遊戲缺少識別碼，沒有發放獎勵。");
   if (state.history.rewardedShiftIds.includes(shiftId)) {
-    return outcome(state, false, "這次班次的獎勵已經領取。");
+    return outcome(state, false, "這次遊戲的獎勵已經領取。");
   }
 
   const next = clone(state);
-  const safeServed = integer(served);
+  const safeCompleted = integer(completed ?? served);
+  const safeMatched = integer(matched);
   const safeStars = Math.min(3, integer(stars));
   const safeScore = integer(score);
   const safeSkillUses = integer(skillUses);
-  const coins = 12 + safeServed * 6 + safeStars * 7 + Math.max(0, next.buildings.clinic - 1) * 8;
+  const coins = 12 + safeCompleted * 12 + safeStars * 7 + Math.max(0, next.buildings.clinic - 1) * 8;
   const starlight = safeStars > 0 ? 1 + Math.floor(safeStars / 3) : 0;
   const firstClinicToday = !next.daily.clinic;
   const restoration = firstClinicToday ? 1 + safeStars : 0;
@@ -373,16 +383,18 @@ export function recordClinicShift(state, { id, served = 0, stars = 0, score = 0,
   next.restoration += restoration;
   next.daily.clinic = true;
   next.lifetime.shifts += 1;
-  next.lifetime.served += safeServed;
+  next.lifetime.served += safeCompleted;
+  next.lifetime.pairsMatched += safeMatched;
   next.lifetime.skillUses += safeSkillUses;
   next.history.rewardedShiftIds.push(shiftId);
   next.history.rewardedShiftIds = next.history.rewardedShiftIds.slice(-40);
 
-  return collectionOutcome(state, next, `值班成果已帶回小鎮：星幣 +${coins}${starlight ? `、星砂 +${starlight}` : ""}。`, {
+  return collectionOutcome(state, next, `遊戲成果已帶回小鎮：星幣 +${coins}${starlight ? `、星砂 +${starlight}` : ""}。`, {
     coins,
     starlight,
     restoration,
     score: safeScore,
+    matched: safeMatched,
     skillUses: safeSkillUses
   });
 }
@@ -444,7 +456,7 @@ export function townStage(restoration) {
   }
   if (restoration >= 20) return { title: "街角重新熱鬧", detail: "居民開始在廣場停留與交談。", rank: "新芽" };
   if (restoration >= 10) return { title: "暖燈逐盞點亮", detail: "藥園與工坊之間出現新的小徑。", rank: "微光" };
-  return { title: "第一盞燈正亮起", detail: "照顧居民、完成委託，讓暖燈坡逐步甦醒。", rank: "初亮" };
+  return { title: "第一盞燈正亮起", detail: "完成遊戲與居民委託，讓暖燈坡逐步甦醒。", rank: "初亮" };
 }
 
 export function createTownController({ root = document, storage = globalThis.localStorage, onEnterClinic, onNotify } = {}) {
@@ -596,7 +608,7 @@ export function createTownController({ root = document, storage = globalThis.loc
       ui.commissionAction.textContent = state.daily.commission ? "今日已送達" : "交付 3 片月芽葉";
     }
     if (ui.lifetime) {
-      ui.lifetime.textContent = `已完成 ${state.lifetime.shifts} 班 · 照顧 ${state.lifetime.served} 位居民 · 升級 ${state.lifetime.upgrades} 次`;
+      ui.lifetime.textContent = `已完成 ${state.lifetime.shifts} 場 · 配成 ${state.lifetime.pairsMatched} 組 · 升級 ${state.lifetime.upgrades} 次`;
     }
     renderBuildings();
     renderWishes();
