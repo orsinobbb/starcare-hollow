@@ -95,3 +95,23 @@ test("zoom reflows without disabling accessibility and matches celebrate before 
   assert.match(app, /beginPairCelebration/);
   assert.match(app, /配對成功：/);
 });
+
+test("the expedition ships a mobile canvas surface with isolated gestures and deterministic state", async () => {
+  const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
+  const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
+  const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
+  const renderer = await readFile(new URL("src/expedition-renderer.js", siteRootUrl), "utf8");
+  const expedition = await readFile(new URL("src/expedition-engine.js", siteRootUrl), "utf8");
+
+  assert.match(html, /id="expedition-view"/);
+  assert.match(html, /id="expedition-canvas"[^>]*tabindex="0"/);
+  assert.match(html, /id="expedition-map-help"/);
+  assert.match(css, /#expedition-canvas[\s\S]*touch-action:\s*none/);
+  assert.match(css, /#expedition-canvas[\s\S]*height:\s*clamp/);
+  assert.match(app, /createExpeditionController/);
+  assert.match(renderer, /devicePixelRatio/);
+  assert.match(renderer, /FIXED_STEP_SECONDS/);
+  assert.match(renderer, /MAX_PARTICLES/);
+  assert.match(expedition, /createExpeditionState/);
+  assert.match(expedition, /compassClue/);
+});

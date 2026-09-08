@@ -12,10 +12,12 @@ import {
   fulfillCommission,
   loadTownState,
   recordClinicShift,
+  recordExpeditionProgress,
   saveTownState,
   tendGarden,
   upgradeBuilding
 } from "../src/town.js";
+import { excavate } from "../src/expedition-engine.js";
 
 test("a new town starts with one coherent shared inventory", () => {
   const state = createTownState();
@@ -45,7 +47,7 @@ test("town actions unlock permanent collectibles rather than only currencies", (
 
   const reward = claimDailyReward(state);
   assert.deepEqual(reward.delta.collectionIds, ["three-wish-medal", "lantern-keepsake"]);
-  assert.equal(reward.state.collections.unlocked.length, COLLECTION_ITEMS.length);
+  assert.equal(reward.state.collections.unlocked.length, COLLECTION_ITEMS.length - 2);
 });
 
 test("the garden can be harvested only once each town day", () => {
@@ -136,6 +138,25 @@ test("town saves round-trip and malformed saves fall back safely", () => {
   assert.equal(memory.get(TOWN_BACKUP_KEY), "{broken", "the unreadable payload is preserved before replacement");
 });
 
+test("an expedition discovery persists with the town and becomes permanent collection progress", () => {
+  const town = createTownState();
+  const expedition = structuredClone(town.expedition);
+  const firstTarget = expedition.targets[0];
+  firstTarget.x = 1;
+  firstTarget.y = 0;
+  expedition.terrain["1,0"] = "sand";
+  const excavation = excavate(expedition, 1, 0);
+  const result = recordExpeditionProgress(town, excavation.state, excavation.event);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.state.lifetime.expeditionDigs, 1);
+  assert.equal(result.state.lifetime.relicsFound, 1);
+  assert.equal(result.state.resources.coins, 108);
+  assert.equal(result.state.resources.starlight, 1);
+  assert.ok(result.state.collections.unlocked.includes("starsand-compass"));
+  assert.equal(town.expedition.foundTargetIds.length, 0, "the previous town snapshot stays immutable");
+});
+
 test("schema v1 saves migrate without losing progress and infer collectibles", () => {
   const legacy = createTownState();
   legacy.schemaVersion = 1;
@@ -145,7 +166,11 @@ test("schema v1 saves migrate without losing progress and infer collectibles", (
   delete legacy.lifetime.dailyRewards;
   delete legacy.lifetime.skillUses;
   delete legacy.lifetime.pairsMatched;
+  delete legacy.lifetime.expeditionDigs;
+  delete legacy.lifetime.relicsFound;
+  delete legacy.lifetime.completedExpeditions;
   delete legacy.collections;
+  delete legacy.expedition;
 
   const payload = JSON.stringify({ schemaVersion: 1, gameVersion: "0.2.0", profile: legacy });
   const storage = { getItem: () => payload, setItem: () => {} };
@@ -156,6 +181,8 @@ test("schema v1 saves migrate without losing progress and infer collectibles", (
   assert.equal(migrated.lifetime.dailyRewards, 0);
   assert.equal(migrated.lifetime.skillUses, 0);
   assert.equal(migrated.lifetime.pairsMatched, 0);
+  assert.equal(migrated.lifetime.expeditionDigs, 0);
+  assert.equal(migrated.expedition.revealed.includes("0,0"), true);
   assert.ok(migrated.collections.unlocked.includes("moonleaf-pressing"));
   assert.ok(migrated.collections.unlocked.includes("clinic-badge"));
   assert.ok(migrated.collections.unlocked.includes("lantern-keepsake"));

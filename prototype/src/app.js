@@ -16,6 +16,7 @@ import {
   scoreForMatch
 } from "./engine.js";
 import { createTownController } from "./town.js";
+import { createExpeditionController } from "./expedition.js";
 import { APP_VERSION } from "./version.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -44,6 +45,7 @@ let toastTimeout = null;
 let helpReturnStatus = "briefing";
 let currentShiftId = null;
 let townController = null;
+let expeditionController = null;
 
 const elements = {
   goalValue: $("#goal-value"),
@@ -79,11 +81,14 @@ const elements = {
   toast: $("#toast"),
   townView: $("#town-view"),
   clinicView: $("#clinic-view"),
+  expeditionView: $("#expedition-view"),
   townHud: $("#town-hud"),
   shiftHud: $("#shift-hud"),
+  expeditionHud: $("#expedition-hud"),
   clinicControls: $("#clinic-controls"),
   townTab: $("#town-tab"),
-  clinicTab: $("#clinic-tab")
+  clinicTab: $("#clinic-tab"),
+  expeditionTab: $("#expedition-tab")
 };
 
 function createInitialState(status = "briefing", choices = {}) {
@@ -154,14 +159,17 @@ function showToast(message, duration = 2400) {
 
 function setActiveView(view) {
   const townActive = view === "town";
+  const clinicActive = view === "clinic";
+  const expeditionActive = view === "expedition";
   elements.townView.hidden = !townActive;
-  elements.clinicView.hidden = townActive;
+  elements.clinicView.hidden = !clinicActive;
+  elements.expeditionView.hidden = !expeditionActive;
   elements.townHud.hidden = !townActive;
-  elements.shiftHud.hidden = townActive;
-  elements.clinicControls.hidden = townActive;
-  elements.townTab.removeAttribute("aria-current");
-  elements.clinicTab.removeAttribute("aria-current");
-  (townActive ? elements.townTab : elements.clinicTab).setAttribute("aria-current", "page");
+  elements.shiftHud.hidden = !clinicActive;
+  elements.expeditionHud.hidden = !expeditionActive;
+  elements.clinicControls.hidden = !clinicActive;
+  for (const tab of [elements.townTab, elements.clinicTab, elements.expeditionTab]) tab.removeAttribute("aria-current");
+  ({ town: elements.townTab, clinic: elements.clinicTab, expedition: elements.expeditionTab }[view]).setAttribute("aria-current", "page");
   document.body.dataset.view = view;
 }
 
@@ -174,6 +182,7 @@ function showTownView() {
   elements.helpModal.hidden = true;
   elements.pauseModal.hidden = true;
   elements.resultModal.hidden = true;
+  expeditionController?.hide();
   setActiveView("town");
   townController?.render();
   window.scrollTo({ top: 0, behavior: "auto" });
@@ -181,12 +190,28 @@ function showTownView() {
 }
 
 function showClinicView() {
+  expeditionController?.hide();
   setActiveView("clinic");
   elements.briefingModal.hidden = state.status !== "briefing";
   elements.pauseModal.hidden = state.status !== "paused";
   elements.resultModal.hidden = state.status !== "result";
   window.scrollTo({ top: 0, behavior: "auto" });
   if (state.status === "briefing") $("#start-button").focus();
+  return true;
+}
+
+function showExpeditionView() {
+  if (state.status === "running" || state.status === "help") {
+    showToast("小遊戲進行中；請先暫停再前往遠征。", 2200);
+    return false;
+  }
+  elements.briefingModal.hidden = true;
+  elements.helpModal.hidden = true;
+  elements.pauseModal.hidden = true;
+  elements.resultModal.hidden = true;
+  setActiveView("expedition");
+  window.scrollTo({ top: 0, behavior: "auto" });
+  expeditionController?.show();
   return true;
 }
 
@@ -820,6 +845,7 @@ elements.skillList.addEventListener("click", (event) => {
 });
 elements.townTab.addEventListener("click", showTownView);
 elements.clinicTab.addEventListener("click", showClinicView);
+elements.expeditionTab.addEventListener("click", showExpeditionView);
 $("#start-button").addEventListener("click", () => startGame());
 $("#briefing-return-town").addEventListener("click", showTownView);
 elements.pauseButton.addEventListener("click", () => {
@@ -858,12 +884,22 @@ window.addEventListener("keydown", (event) => {
 });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && state.status === "running") pauseGame();
+  if (document.hidden) expeditionController?.hide();
+  else if (document.body.dataset.view === "expedition") expeditionController?.show();
 });
 
 townController = createTownController({
   root: document,
   storage: window.localStorage,
   onEnterClinic: showClinicView,
+  onEnterExpedition: showExpeditionView,
+  onNotify: showToast
+});
+
+expeditionController = createExpeditionController({
+  root: document,
+  townController,
+  onLeave: showTownView,
   onNotify: showToast
 });
 
@@ -871,6 +907,8 @@ if (params.get("debug") === "1") {
   window.__STARCARE_DEBUG__ = {
     snapshot: () => structuredClone(state),
     townSnapshot: () => townController.snapshot(),
+    expeditionSnapshot: () => expeditionController.snapshot(),
+    excavate: (x, y) => expeditionController.excavate(x, y),
     clickCard: handleCard,
     matchOne: autoCompleteGroup,
     useSkill: activateSkill,
@@ -886,7 +924,9 @@ $("#start-button").textContent = `開始 ${formatTime(gameDuration)} 委託`;
 $("#briefing-goal").textContent = `目標：完成 ${gameGoal} 個短關卡`;
 renderAll();
 if (params.get("view") === "clinic") showClinicView();
+else if (params.get("view") === "expedition") showExpeditionView();
 else showTownView();
 window.requestAnimationFrame(frame);
 if (params.get("view") === "clinic") $("#start-button").focus();
+else if (params.get("view") === "expedition") $("#expedition-canvas").focus();
 else $("#enter-clinic").focus();

@@ -1,4 +1,5 @@
 import { APP_VERSION, SAVE_SCHEMA_VERSION } from "./version.js";
+import { createExpeditionState, normalizeExpeditionState } from "./expedition-engine.js";
 
 export const TOWN_SAVE_KEY = "starcare-hollow:town:v1";
 export const TOWN_BACKUP_KEY = "starcare-hollow:town:backup";
@@ -113,6 +114,22 @@ export const COLLECTION_ITEMS = Object.freeze([
     name: "重燃街燈",
     detail: "暖燈坡重新亮起的街燈縮影，見證第一段復甦。",
     hint: "讓暖燈坡修復度達到 10"
+  },
+  {
+    id: "starsand-compass",
+    icon: "✦",
+    category: "遠征紀錄",
+    name: "星砂羅盤針",
+    detail: "第一次回應星脈的方向；它記得你挖下的第一格。",
+    hint: "完成第一次星脈調查"
+  },
+  {
+    id: "echo-vial-exhibit",
+    icon: "⚗",
+    category: "回聲博物間",
+    name: "古療瓶展示牌",
+    detail: "星砂群島的第一批主要寶物，終於有了能被看見的位置。",
+    hint: "在星砂群島找到三件主要寶物"
   }
 ]);
 
@@ -165,11 +182,15 @@ export function createTownState() {
       commissions: 0,
       upgrades: 0,
       dailyRewards: 0,
-      skillUses: 0
+      skillUses: 0,
+      expeditionDigs: 0,
+      relicsFound: 0,
+      completedExpeditions: 0
     },
     history: {
       rewardedShiftIds: []
     },
+    expedition: createExpeditionState(),
     updatedAt: null
   };
 }
@@ -220,6 +241,7 @@ export function normalizeTownState(raw) {
         ? raw.history.rewardedShiftIds.filter((id) => typeof id === "string").slice(-40)
         : []
     },
+    expedition: normalizeExpeditionState(raw.expedition),
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : null
   };
 
@@ -288,6 +310,8 @@ export function collectionRequirementsMet(state, itemId) {
   if (itemId === "restorer-pin") return state.lifetime.upgrades >= 1;
   if (itemId === "three-wish-medal") return state.lifetime.dailyRewards >= 1;
   if (itemId === "lantern-keepsake") return state.restoration >= 10;
+  if (itemId === "starsand-compass") return state.lifetime.expeditionDigs >= 1;
+  if (itemId === "echo-vial-exhibit") return state.lifetime.relicsFound >= 3;
   return false;
 }
 
@@ -399,6 +423,40 @@ export function recordClinicShift(state, {
   });
 }
 
+export function recordExpeditionProgress(state, expedition, event = {}) {
+  const next = clone(state);
+  const normalized = normalizeExpeditionState(expedition);
+  const previousFound = new Set(state.expedition?.foundTargetIds ?? []);
+  const discoveries = normalized.foundTargetIds
+    .filter((id) => !previousFound.has(id))
+    .map((id) => normalized.targets.find((target) => target.id === id))
+    .filter(Boolean);
+  const becameComplete = normalized.completed && !state.expedition?.completed;
+
+  next.expedition = normalized;
+  if (event.type === "dig" || event.type === "discovery") next.lifetime.expeditionDigs += 1;
+  next.lifetime.relicsFound += discoveries.length;
+  if (becameComplete) next.lifetime.completedExpeditions += 1;
+
+  const reward = discoveries.reduce((total, target) => ({
+    coins: total.coins + target.reward.coins,
+    starlight: total.starlight + target.reward.starlight
+  }), { coins: 0, starlight: 0 });
+  next.resources.coins += reward.coins;
+  next.resources.starlight += reward.starlight;
+
+  const discoveryNames = discoveries.map((target) => target.name);
+  const message = discoveryNames.length
+    ? `遠征成果已收下：${discoveryNames.join("、")}；星幣 +${reward.coins}、星砂 +${reward.starlight}。`
+    : event.message ?? "遠征地圖已自動保存。";
+  return collectionOutcome(state, next, message, {
+    ...reward,
+    discoveries: discoveryNames,
+    completed: becameComplete,
+    expeditionDigs: event.type === "dig" || event.type === "discovery" ? 1 : 0
+  });
+}
+
 export function claimDailyReward(state) {
   if (state.daily.rewardClaimed) return outcome(state, false, "今天的星願禮已經領取。");
   if (completedWishCount(state) < DAILY_WISHES.length) {
@@ -459,11 +517,12 @@ export function townStage(restoration) {
   return { title: "第一盞燈正亮起", detail: "完成遊戲與居民委託，讓暖燈坡逐步甦醒。", rank: "初亮" };
 }
 
-export function createTownController({ root = document, storage = globalThis.localStorage, onEnterClinic, onNotify } = {}) {
+export function createTownController({ root = document, storage = globalThis.localStorage, onEnterClinic, onEnterExpedition, onNotify } = {}) {
   let state = loadTownState(storage);
   let recentCollectionIds = [];
   const notify = typeof onNotify === "function" ? onNotify : () => {};
   const enterClinic = typeof onEnterClinic === "function" ? onEnterClinic : () => {};
+  const enterExpedition = typeof onEnterExpedition === "function" ? onEnterExpedition : () => {};
   const element = (selector) => root.querySelector(selector);
 
   const ui = {
@@ -608,7 +667,7 @@ export function createTownController({ root = document, storage = globalThis.loc
       ui.commissionAction.textContent = state.daily.commission ? "今日已送達" : "交付 3 片月芽葉";
     }
     if (ui.lifetime) {
-      ui.lifetime.textContent = `已完成 ${state.lifetime.shifts} 場 · 配成 ${state.lifetime.pairsMatched} 組 · 升級 ${state.lifetime.upgrades} 次`;
+      ui.lifetime.textContent = `已完成 ${state.lifetime.shifts} 場 · 配成 ${state.lifetime.pairsMatched} 組 · 遠征 ${state.lifetime.expeditionDigs} 格`;
     }
     renderBuildings();
     renderWishes();
@@ -617,6 +676,8 @@ export function createTownController({ root = document, storage = globalThis.loc
 
   element("#enter-clinic")?.addEventListener("click", enterClinic);
   element("#clinic-building-action")?.addEventListener("click", enterClinic);
+  element("#enter-expedition")?.addEventListener("click", enterExpedition);
+  element("#expedition-building-action")?.addEventListener("click", enterExpedition);
   ui.gardenAction?.addEventListener("click", () => commit(tendGarden(state)));
   ui.commissionAction?.addEventListener("click", () => commit(fulfillCommission(state)));
   ui.claimReward?.addEventListener("click", () => commit(claimDailyReward(state)));
@@ -632,6 +693,7 @@ export function createTownController({ root = document, storage = globalThis.loc
   return {
     render,
     snapshot: () => clone(state),
-    recordShift: (summary) => commit(recordClinicShift(state, summary))
+    recordShift: (summary) => commit(recordClinicShift(state, summary)),
+    recordExpedition: (expedition, event) => commit(recordExpeditionProgress(state, expedition, event))
   };
 }

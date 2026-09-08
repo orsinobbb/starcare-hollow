@@ -9,7 +9,7 @@
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.5.2" />
+    <link rel="stylesheet" href="./styles.css?v=0.6.0" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.5.2</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.6.0</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -63,6 +63,21 @@
           </div>
         </div>
 
+        <div id="expedition-hud" class="hud expedition-hud" aria-label="星脈遠征狀態" hidden>
+          <div class="hud-stat">
+            <span class="hud-label">遠征專注</span>
+            <strong id="expedition-focus">30 / 30</strong>
+          </div>
+          <div class="hud-stat">
+            <span class="hud-label">主要寶物</span>
+            <strong id="expedition-relics">0 / 3</strong>
+          </div>
+          <div class="hud-stat">
+            <span class="hud-label">探索進度</span>
+            <strong id="expedition-progress">已調查 1 格</strong>
+          </div>
+        </div>
+
         <nav id="clinic-controls" class="header-actions" aria-label="遊戲控制" hidden>
           <button id="help-button" class="icon-button" type="button" aria-label="開啟玩法說明">?</button>
           <button id="toggle-sound" class="icon-button" type="button" aria-pressed="true" aria-label="關閉音效">
@@ -75,6 +90,7 @@
       <nav class="world-nav" aria-label="主要區域">
         <button id="town-tab" class="world-tab" type="button" aria-current="page">⌂ 小鎮</button>
         <button id="clinic-tab" class="world-tab" type="button">✚ 小遊戲屋</button>
+        <button id="expedition-tab" class="world-tab" type="button">✦ 星脈遠征</button>
         <span id="save-status" class="save-status" role="status">✓ 新存檔已建立</span>
       </nav>
 
@@ -87,6 +103,7 @@
               <p id="town-stage-detail">完成小遊戲與居民委託，讓暖燈坡逐步甦醒。</p>
               <div class="town-hero-actions">
                 <button id="enter-clinic" class="primary-button" type="button">前往小遊戲屋</button>
+                <button id="enter-expedition" class="secondary-button" type="button">前往星砂群島</button>
                 <span>短玩一次也會永久累積</span>
               </div>
             </div>
@@ -175,6 +192,21 @@
                     <span>街燈</span><span>花圃</span><span>星橋</span>
                   </div>
                 </article>
+
+                <article class="town-building expedition-building">
+                  <div class="building-icon" aria-hidden="true">✦</div>
+                  <div class="building-heading">
+                    <span class="building-kicker">逐格探索</span>
+                    <strong>星脈遠征</strong>
+                    <span class="level-chip">星砂群島</span>
+                  </div>
+                  <p>拖曳地圖、點選相鄰格調查；羅盤會留下可推理的遠近線索。</p>
+                  <p class="building-benefit">主要寶物不會消失，找到後會寫入星願手札。</p>
+                  <div class="building-actions">
+                    <button id="expedition-building-action" class="primary-button compact" type="button">開始挖寶</button>
+                  </div>
+                  <small class="building-cost">技術切片：Canvas 高 DPI、慣性鏡頭與本機存檔已啟用</small>
+                </article>
               </div>
             </section>
 
@@ -203,11 +235,67 @@
                 <p class="eyebrow">永久收藏</p>
                 <h2 id="collection-title">星願手札</h2>
               </div>
-              <strong id="town-collection-count">1 / 8</strong>
+                <strong id="town-collection-count">1 / 10</strong>
             </div>
             <p>資源會被使用，手札不會。採收、委託、小遊戲、升級與修復都會留下獨一份紀念。</p>
             <div id="town-collection-grid" class="collection-grid" aria-live="polite"></div>
           </section>
+        </section>
+
+        <section id="expedition-view" class="expedition-view" hidden aria-labelledby="expedition-title">
+          <section class="expedition-banner">
+            <div>
+              <p class="eyebrow">星砂群島 · 可玩技術切片</p>
+              <h2 id="expedition-title">星脈遠征</h2>
+              <p>點已開啟格旁邊的迷霧調查；每次翻開地表後，羅盤會提示下一件主要寶物有多近。</p>
+            </div>
+            <button id="expedition-return" class="secondary-button" type="button">帶著成果回小鎮</button>
+          </section>
+
+          <div class="expedition-layout">
+            <section class="expedition-map-card" aria-labelledby="expedition-map-title">
+              <div class="section-heading expedition-map-heading">
+                <div>
+                  <p class="eyebrow">可拖曳地圖 · 點格調查</p>
+                  <h3 id="expedition-map-title">雲海下的星砂層</h3>
+                </div>
+                <span class="map-status-chip">自動儲存</span>
+              </div>
+              <canvas id="expedition-canvas" tabindex="0" aria-label="星砂群島探索地圖" aria-describedby="expedition-map-help"></canvas>
+              <p id="expedition-map-help" class="expedition-map-help">地圖內：單指拖曳移動鏡頭，輕點相鄰迷霧格調查。鍵盤可用方向鍵選格、Enter 調查；地圖外仍可正常捲動與縮放。</p>
+              <p id="expedition-log" class="expedition-log" role="status" aria-live="polite">羅盤待命：從起點相鄰的格子開始調查。</p>
+            </section>
+
+            <aside class="expedition-side-panel" aria-labelledby="compass-title">
+              <section id="expedition-compass" class="compass-card" data-clue="silent">
+                <p class="eyebrow">距離線索</p>
+                <h3 id="compass-title"><span id="expedition-clue-title">羅盤待命</span></h3>
+                <p id="expedition-clue-detail">從起點相鄰的格子開始調查。</p>
+                <span class="compass-ring" aria-hidden="true">✦</span>
+              </section>
+
+              <section class="excavation-card" aria-labelledby="selected-title">
+                <p class="eyebrow">本次操作</p>
+                <h3 id="selected-title"><span id="expedition-selected">座標 2 · 1</span></h3>
+                <p id="expedition-selected-detail">星砂 · 調查消耗 1 專注</p>
+                <button id="expedition-dig" class="primary-button" type="button">調查星砂（-1）</button>
+                <div id="expedition-map-controls" class="expedition-map-controls" aria-label="選擇地圖格子">
+                  <span></span><button type="button" data-expedition-move="0,-1" aria-label="往上選格">↑</button><span></span>
+                  <button type="button" data-expedition-move="-1,0" aria-label="往左選格">←</button><span class="map-control-center" aria-hidden="true">◎</span><button type="button" data-expedition-move="1,0" aria-label="往右選格">→</button>
+                  <span></span><button type="button" data-expedition-move="0,1" aria-label="往下選格">↓</button><span></span>
+                </div>
+              </section>
+
+              <section class="expedition-principles" aria-label="遠征保護規則">
+                <strong>安心探索</strong>
+                <ul>
+                  <li>已翻開地格與找到的寶物永久保存。</li>
+                  <li>專注不足只代表可先返回，不會沒收成果。</li>
+                  <li>每次挖掘都先顯示翻土與回饋，再更新狀態。</li>
+                </ul>
+              </section>
+            </aside>
+          </div>
         </section>
 
         <div id="clinic-view" hidden>
@@ -395,6 +483,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.5.2"></script>
+    <script type="module" src="./src/app.js?v=0.6.0"></script>
   </body>
 </html>
