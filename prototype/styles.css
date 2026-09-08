@@ -3080,6 +3080,7 @@ body.is-board-dragging {
 
 .minigame-card {
   position: relative;
+  container-type: inline-size;
   min-width: 0;
   padding: 1rem;
   background:
@@ -3143,6 +3144,8 @@ body.is-board-dragging {
   border: 1px solid rgba(239, 199, 120, 0.26);
   border-radius: 20px;
   box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.26);
+  contain: layout paint;
+  overflow: clip;
 }
 
 .matching-board[data-mode="triple-pack"] {
@@ -3159,6 +3162,7 @@ body.is-board-dragging {
   border: 0;
   perspective: 650px;
   transition: opacity 220ms, transform 220ms;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -3290,10 +3294,63 @@ body.is-board-dragging {
   animation: hint-pulse 600ms ease-in-out infinite alternate;
 }
 
+.match-success-mark {
+  position: absolute;
+  z-index: 4;
+  inset: 15%;
+  display: grid;
+  place-content: center;
+  place-items: center;
+  gap: 0.12rem;
+  pointer-events: none;
+  color: #12213b;
+  text-align: center;
+  opacity: 0;
+  background: radial-gradient(circle, rgba(255, 250, 211, 0.98) 0 38%, rgba(255, 219, 112, 0.88) 39% 54%, transparent 56%);
+  filter: drop-shadow(0 0 14px rgba(255, 226, 129, 0.9));
+}
+
+.match-success-mark b {
+  font-size: clamp(1.25rem, 3vw, 2.2rem);
+  line-height: 1;
+}
+
+.match-success-mark i {
+  padding: 0.08rem 0.32rem;
+  color: #fff9df;
+  font-size: clamp(0.5rem, 1vw, 0.68rem);
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+  background: rgba(20, 32, 54, 0.88);
+  border-radius: 99px;
+}
+
+.match-card.is-match-success {
+  z-index: 2;
+  animation: matched-card-exit 900ms ease-in-out forwards;
+}
+
+.match-card.is-match-success .match-card-front {
+  border-color: #fff2a8;
+  box-shadow: 0 0 0 3px rgba(255, 230, 137, 0.42), 0 0 30px rgba(255, 218, 102, 0.78);
+}
+
+.match-card.is-match-success .match-success-mark {
+  animation: match-confirm 780ms cubic-bezier(0.18, 0.82, 0.25, 1) both;
+}
+
 .match-card.is-removed {
   pointer-events: none;
   opacity: 0;
   transform: scale(0.65);
+}
+
+.care-feedback.tone-match {
+  color: #fff7c9;
+  border-color: rgba(255, 224, 117, 0.68);
+  background: linear-gradient(90deg, rgba(87, 137, 91, 0.28), rgba(239, 199, 120, 0.2));
+  box-shadow: 0 0 20px rgba(255, 221, 114, 0.13);
 }
 
 .tray-area {
@@ -3418,6 +3475,18 @@ body.is-board-dragging {
   to { box-shadow: 0 0 24px rgba(197, 255, 173, 0.62); }
 }
 
+@keyframes match-confirm {
+  0% { opacity: 0; transform: scale(0.55) rotate(-8deg); }
+  24%, 68% { opacity: 1; transform: scale(1) rotate(0); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+@keyframes matched-card-exit {
+  0%, 70% { opacity: 1; transform: scale(1); }
+  82% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(0.78); }
+}
+
 @keyframes tray-in {
   from { transform: translateY(-8px) scale(0.86); opacity: 0; }
   to { transform: none; opacity: 1; }
@@ -3489,6 +3558,20 @@ body.is-board-dragging {
   }
 }
 
+@container (max-width: 360px) {
+  .matching-board,
+  .matching-board[data-mode="triple-pack"] {
+    grid-template-columns: repeat(4, minmax(44px, 1fr));
+    gap: 0.32rem;
+    padding: 0.38rem;
+  }
+
+  .match-card-front i {
+    padding-inline: 0.28rem;
+    font-size: 0.52rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .match-card-inner,
   .match-card,
@@ -3498,5 +3581,14 @@ body.is-board-dragging {
   .tray-slot.is-filled {
     animation: none;
     transition: none;
+  }
+
+  .match-card.is-match-success,
+  .match-card.is-match-success .match-success-mark {
+    animation: none;
+  }
+
+  .match-card.is-match-success .match-success-mark {
+    opacity: 1;
   }
 }

@@ -28,6 +28,8 @@ const DIFFICULTIES = {
   focus: { label: "專注", pairCount: 8, quickPairCount: 8, tripleCount: 6, preview: 1.4, mistakePenalty: 2 }
 };
 
+const MATCH_CELEBRATION_SECONDS = 0.9;
+
 const params = new URLSearchParams(window.location.search);
 const gameDuration = Math.max(15, Math.min(600, Number(params.get("duration")) || 120));
 const gameGoal = Math.max(1, Math.min(12, Number(params.get("goal")) || 3));
@@ -108,6 +110,8 @@ function createInitialState(status = "briefing", choices = {}) {
     secondCardId: null,
     locked: false,
     compareRemaining: 0,
+    matchCelebrationRemaining: 0,
+    celebratingIds: [],
     previewRemaining: 0,
     revealRemaining: 0,
     hintIds: [],
@@ -251,6 +255,8 @@ function setupRound() {
   state.secondCardId = null;
   state.locked = false;
   state.compareRemaining = 0;
+  state.matchCelebrationRemaining = 0;
+  state.celebratingIds = [];
   state.previewRemaining = state.currentMode === "memory" ? DIFFICULTIES[state.difficulty].preview : 0;
   state.revealRemaining = 0;
   state.hintIds = [];
@@ -304,8 +310,29 @@ function awardMatch(groupSize, label = "配對成功") {
   state.matched += 1;
   state.score += scoreForMatch(state.combo, groupSize);
   state.skillCharge = addSkillCharge(state.skillCharge);
-  showActionFeedback(`${label} · 連續 ${state.combo}`, "good");
+  showActionFeedback(`✓ ${label} · 連續 ${state.combo}`, "match", MATCH_CELEBRATION_SECONDS);
   playMatchSound(state.combo);
+}
+
+function beginPairCelebration(cards, label) {
+  state.celebratingIds = cards.map((card) => card.id);
+  state.matchCelebrationRemaining = MATCH_CELEBRATION_SECONDS;
+  state.locked = true;
+  awardMatch(2, label);
+  announce(`${label}！確認完成後卡片會化成星光。`);
+}
+
+function finishPairCelebration() {
+  for (const cardId of state.celebratingIds) {
+    const card = cardById(cardId);
+    if (card) card.state = "matched";
+  }
+  state.celebratingIds = [];
+  state.firstCardId = null;
+  state.secondCardId = null;
+  state.locked = false;
+  completeRoundIfNeeded();
+  renderAll();
 }
 
 function boardIsComplete() {
@@ -341,13 +368,7 @@ function handlePairCard(card) {
   state.locked = true;
 
   if (isMatchingGroup([first, card], 2)) {
-    first.state = "matched";
-    card.state = "matched";
-    state.firstCardId = null;
-    state.secondCardId = null;
-    state.locked = false;
-    awardMatch(2, `${card.name}找到同伴`);
-    completeRoundIfNeeded();
+    beginPairCelebration([first, card], `${card.name}找到同伴`);
     return;
   }
 
@@ -398,6 +419,13 @@ function autoCompleteGroup() {
   const ids = findAvailableGroup(state.cards, groupSize);
   if (!ids.length) return false;
   const cards = ids.map(cardById).filter(Boolean);
+  if (groupSize === 2) {
+    state.firstCardId = cards[0]?.id ?? null;
+    state.secondCardId = cards[1]?.id ?? null;
+    state.compareRemaining = 0;
+    beginPairCelebration(cards, "星引完成一組");
+    return true;
+  }
   for (const card of cards) card.state = "matched";
   state.tray = state.tray.filter((card) => !ids.includes(card.id));
   state.firstCardId = null;
@@ -467,6 +495,11 @@ function tick(delta) {
     const previous = state.revealRemaining;
     state.revealRemaining = Math.max(0, state.revealRemaining - delta);
     if (previous > 0 && state.revealRemaining === 0) renderBoard();
+  }
+
+  if (state.matchCelebrationRemaining > 0) {
+    state.matchCelebrationRemaining = Math.max(0, state.matchCelebrationRemaining - delta);
+    if (state.matchCelebrationRemaining === 0) finishPairCelebration();
   }
 
   if (state.transitionRemaining > 0) {
@@ -678,20 +711,24 @@ function renderBoard() {
     const faceUp = cardIsFaceUp(card);
     const removed = card.state === "matched" || card.state === "in-tray";
     const selected = card.id === state.firstCardId || card.id === state.secondCardId;
+    const celebrating = state.celebratingIds.includes(card.id) && state.matchCelebrationRemaining > 0;
     const hinted = state.hintIds.includes(card.id) && state.hintRemaining > 0;
     button.type = "button";
     button.dataset.cardId = card.id;
-    button.className = `match-card palette-${card.palette}${faceUp ? " is-face-up" : ""}${selected ? " is-selected" : ""}${removed ? " is-removed" : ""}${hinted ? " is-hint" : ""}`;
+    button.className = `match-card palette-${card.palette}${faceUp ? " is-face-up" : ""}${selected ? " is-selected" : ""}${celebrating ? " is-match-success" : ""}${removed ? " is-removed" : ""}${hinted ? " is-hint" : ""}`;
     button.disabled = blocked || removed;
     button.setAttribute("aria-pressed", String(selected));
-    button.setAttribute("aria-label", removed
+    button.setAttribute("aria-label", celebrating
+      ? `配對成功：${card.name}`
+      : removed
       ? `已完成：${card.name}`
       : faceUp ? `${card.name}${selected ? "，已選取" : ""}` : "尚未翻開的星願卡");
     button.innerHTML = `
       <span class="match-card-inner">
         <span class="match-card-back" aria-hidden="true"><b>✦</b><i>•ᴗ•</i></span>
         <span class="match-card-front" aria-hidden="true"><b class="card-character family-${card.familyId}"></b><i>${card.name}</i></span>
-      </span>`;
+      </span>
+      <span class="match-success-mark" aria-hidden="true"><b>✓</b><i>配對成功</i></span>`;
     elements.gameBoard.append(button);
   }
 }

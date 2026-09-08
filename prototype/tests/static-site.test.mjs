@@ -78,3 +78,20 @@ test("clinic uses ordinary buttons so the page remains scrollable on touch scree
   assert.match(app, /data-skill-id/);
   assert.doesNotMatch(app, /pointerdown|pointermove|touchmove|preventDefault/);
 });
+
+test("zoom reflows without disabling accessibility and matches celebrate before removal", async () => {
+  const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
+  const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
+  const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
+
+  assert.doesNotMatch(html, /user-scalable\s*=\s*no|maximum-scale\s*=\s*1/);
+  assert.match(css, /container-type:\s*inline-size/);
+  assert.match(css, /@container\s*\(max-width:\s*360px\)/);
+  assert.match(css, /minmax\(44px,\s*1fr\)/);
+  assert.match(css, /\.match-card\.is-match-success/);
+  assert.match(css, /@keyframes\s+matched-card-exit/);
+  assert.match(css, /prefers-reduced-motion[\s\S]*\.match-card\.is-match-success/);
+  assert.match(app, /MATCH_CELEBRATION_SECONDS/);
+  assert.match(app, /beginPairCelebration/);
+  assert.match(app, /配對成功：/);
+});
