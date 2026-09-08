@@ -1,5 +1,10 @@
 import { EXPEDITION_FOCUS_MAX, canExcavate, createExpeditionState, excavate, isInBounds, terrainAt } from "./expedition-engine.js";
-import { EXPEDITION_FOCUS_MOONLEAF_COST, EXPEDITION_FOCUS_RESTORE } from "./town.js";
+import {
+  COMMISSION_MOONLEAF_COST,
+  EXPEDITION_FOCUS_MOONLEAF_COST,
+  EXPEDITION_FOCUS_RESTORE,
+  MINIMUM_DAILY_WISHES_FOR_REST
+} from "./town.js";
 import { ExpeditionRenderer } from "./expedition-renderer.js";
 
 function clamp(value, minimum, maximum) {
@@ -14,6 +19,7 @@ export function createExpeditionController({ root = document, townController, on
   let state = townController.snapshot().expedition ?? createExpeditionState();
   let selectedTile = { x: 1, y: 0 };
   let isAnimating = false;
+  let queuedTile = null;
   const ui = {
     view: element("#expedition-view"),
     focus: element("#expedition-focus"),
@@ -23,6 +29,7 @@ export function createExpeditionController({ root = document, townController, on
     clueDetail: element("#expedition-clue-detail"),
     selected: element("#expedition-selected"),
     selectedDetail: element("#expedition-selected-detail"),
+    queue: element("#expedition-queue"),
     dig: element("#expedition-dig"),
     supplyDetail: element("#expedition-supply-detail"),
     supplySource: element("#expedition-supply-source"),
@@ -34,17 +41,19 @@ export function createExpeditionController({ root = document, townController, on
   };
 
   const renderer = new ExpeditionRenderer(canvas, {
-    onExcavate: (tile) => attemptExcavate(tile.x, tile.y),
+    onExcavate: (tile) => requestExcavate(tile.x, tile.y),
     onFocusTile: (tile) => {
       selectedTile = tile;
       renderSelection();
     },
     onStage: ({ stage, event }) => {
       const stageCopy = {
+        walk: ["♟", "挖礦者正走向標記地點。"],
         aim: ["⌁", "先讓鏟尖定位，準備翻開這一格。"],
         impact: ["✦", "鏟尖落下，地層正在鬆動。"],
         reveal: ["◌", `正在翻開${event.terrain.name}，請看清楚地表回應。`],
         discovery: ["✧", `星光浮現：${event.discovery?.name ?? "遺物"} 正在顯影！`],
+        reward: ["＋", `成果浮現：${formatReward(event.reward)} 已準備收下。`],
         settle: ["✓", "地層穩定中，遠征成果即將收下。"]
       };
       const [icon, text] = stageCopy[stage] ?? ["⌁", "遠征進行中。"];
@@ -62,45 +71,70 @@ export function createExpeditionController({ root = document, townController, on
     return terrainAt(state, selectedTile.x, selectedTile.y);
   }
 
+  function formatReward(reward = {}) {
+    const labels = { coins: "星幣", moonleaf: "月芽葉", timber: "暖木", starlight: "星砂" };
+    const text = Object.entries(reward)
+      .filter(([, amount]) => Number(amount) > 0)
+      .map(([resource, amount]) => `${labels[resource] ?? resource} +${amount}`)
+      .join(" · ");
+    return text || "小鎮材料";
+  }
+
   function renderSelection() {
     if (!isInBounds(state, selectedTile.x, selectedTile.y)) selectedTile = { x: 0, y: 0 };
     const terrain = selectedTerrain();
     const permission = canExcavate(state, selectedTile.x, selectedTile.y);
     if (ui.selected) ui.selected.textContent = `座標 ${selectedTile.x + 1} · ${selectedTile.y + 1}`;
+    const queued = queuedTile && queuedTile.x === selectedTile.x && queuedTile.y === selectedTile.y;
     if (ui.selectedDetail) {
       ui.selectedDetail.textContent = isAnimating
-        ? `${terrain.name} 正在翻開；成果即將在地圖上顯現。`
+        ? queued
+          ? `${terrain.name} 已標記為下一鏟；目前這一鏟的獎勵正在完整顯現。`
+          : `${terrain.name} 正在翻開；現在可點選一格排程下一鏟。`
         : permission.ok
         ? `${terrain.name} · 調查消耗 ${terrain.cost} 專注`
         : permission.reason === "focus"
         ? `${permission.message} 月芽暖茶可回復專注。`
         : permission.message;
     }
-    if (ui.dig) {
-      ui.dig.disabled = isAnimating || !permission.ok;
-      ui.dig.textContent = isAnimating ? "正在翻開地層…" : permission.ok ? `調查 ${terrain.name}（-${terrain.cost}）` : "此格目前不能調查";
+    if (ui.queue) {
+      ui.queue.textContent = queuedTile
+        ? `下一鏟：座標 ${queuedTile.x + 1} · ${queuedTile.y + 1}（可再點其他合法格改派）`
+        : isAnimating
+        ? "下一鏟：現在可標記一個合法相鄰格"
+        : "下一鏟：尚未標記";
     }
-    if (ui.controls) {
-      for (const button of ui.controls.querySelectorAll("button")) button.disabled = isAnimating;
+    if (ui.dig) {
+      ui.dig.disabled = !permission.ok;
+      ui.dig.textContent = isAnimating
+        ? permission.ok
+          ? queued ? `已排程下一鏟：${terrain.name}` : `標記下一鏟：${terrain.name}（-${terrain.cost}）`
+          : "此格目前不能排程"
+        : permission.ok
+        ? `派遣挖礦者：${terrain.name}（-${terrain.cost}）`
+        : "此格目前不能調查";
     }
     canvas.setAttribute("aria-busy", String(isAnimating));
   }
 
   function renderSupply() {
-    const moonleaf = townController.snapshot().resources.moonleaf;
+    const town = townController.snapshot();
+    const moonleaf = town.resources.moonleaf;
     const missing = Math.max(0, EXPEDITION_FOCUS_MAX - state.focus);
     const restored = Math.min(EXPEDITION_FOCUS_RESTORE, missing);
     const full = missing === 0;
     const hasMoonleaf = moonleaf >= EXPEDITION_FOCUS_MOONLEAF_COST;
+    const commissionPending = !town.daily.commission;
+    const teaDefersCommission = commissionPending && moonleaf - EXPEDITION_FOCUS_MOONLEAF_COST < COMMISSION_MOONLEAF_COST;
     if (ui.supplyDetail) {
       ui.supplyDetail.textContent = full
         ? "羅盤專注充足。把月芽葉留給下一段路；每一次調查仍會完整記入地圖。"
         : hasMoonleaf
-        ? `目前有 ${moonleaf} 片月芽葉。現在補給可回復 ${restored} 點專注。`
-        : "現在沒有月芽葉。回小鎮的月芽藥園採收；今日已採收時，完成星願並進入下一日。";
+        ? `目前有 ${moonleaf} 片月芽葉。現在補給可回復 ${restored} 點專注。${teaDefersCommission ? ` 飲用後今日居民委託會改由明日處理；完成任 ${MINIMUM_DAILY_WISHES_FOR_REST} 項星願仍可休息。` : commissionPending ? " 飲用後仍保有今日委託材料。" : " 今日委託已送達，可安心補給。"}`
+        : `現在沒有月芽葉。回小鎮的月芽藥園採收；今日委託是選做，完成任 ${MINIMUM_DAILY_WISHES_FOR_REST} 項星願即可進入下一日。`;
     }
     if (ui.supplySource) {
-      ui.supplySource.textContent = `月芽葉 ${moonleaf} 片 · 小鎮 → 月芽藥園每日採收`;
+      ui.supplySource.textContent = `月芽葉 ${moonleaf} 片 · ${commissionPending ? `居民委託需要 ${COMMISSION_MOONLEAF_COST} 片（可留明日）` : "今日委託已送達"}`;
     }
     if (ui.resupply) {
       ui.resupply.disabled = isAnimating || full || !hasMoonleaf;
@@ -142,8 +176,23 @@ export function createExpeditionController({ root = document, townController, on
     return result;
   }
 
-  async function attemptExcavate(x, y) {
-    if (isAnimating) return { ok: false, state, message: "正在完成這一格的挖掘演出。", event: null };
+  function queueExcavation(x, y) {
+    const permission = canExcavate(state, x, y);
+    if (!permission.ok) {
+      if (ui.log) ui.log.textContent = permission.message;
+      onNotify(permission.message);
+      return { ok: false, state, message: permission.message, event: null };
+    }
+    queuedTile = { x, y };
+    selectedTile = { x, y };
+    renderer.setQueuedTile(queuedTile);
+    updateStage("queued", "⌁", `下一鏟已標記：座標 ${x + 1} · ${y + 1}。目前演出結束後會立刻出發。`);
+    if (ui.log) ui.log.textContent = `下一鏟已標記在座標 ${x + 1} · ${y + 1}。`;
+    renderSelection();
+    return { ok: true, state, message: "下一鏟已標記。", event: null, queued: true };
+  }
+
+  async function beginExcavation(x, y) {
     const result = excavate(state, x, y);
     if (!result.ok) {
       if (ui.log) ui.log.textContent = result.message;
@@ -156,6 +205,7 @@ export function createExpeditionController({ root = document, townController, on
     state = result.state;
     selectedTile = { x, y };
     renderer.setState(state);
+    renderer.setQueuedTile(queuedTile);
     renderSelection();
     updateStage("aim", "⌁", "鏟尖正在定位；這次翻開會先呈現完整的地層反應。");
     if (ui.log) ui.log.textContent = `準備調查座標 ${x + 1} · ${y + 1}…`;
@@ -172,11 +222,24 @@ export function createExpeditionController({ root = document, townController, on
     onNotify(result.event.completed
       ? "星砂群島的主要寶物已全數找回；地圖與收藏都會永久保留。"
       : result.message, result.event.type === "discovery" ? 3200 : 1800);
+
+    const nextTile = queuedTile;
+    queuedTile = null;
+    renderer.setQueuedTile(null);
+    if (nextTile) {
+      const permission = canExcavate(state, nextTile.x, nextTile.y);
+      if (permission.ok) return beginExcavation(nextTile.x, nextTile.y);
+      onNotify(`下一鏟的路徑已改變：${permission.message}`);
+    }
     return result;
   }
 
+  function requestExcavate(x, y) {
+    if (isAnimating) return queueExcavation(x, y);
+    return beginExcavation(x, y);
+  }
+
   function moveSelection(dx, dy) {
-    if (isAnimating) return;
     selectedTile = {
       x: clamp(selectedTile.x + dx, 0, state.width - 1),
       y: clamp(selectedTile.y + dy, 0, state.height - 1)
@@ -185,7 +248,7 @@ export function createExpeditionController({ root = document, townController, on
     renderSelection();
   }
 
-  element("#expedition-dig")?.addEventListener("click", () => attemptExcavate(selectedTile.x, selectedTile.y));
+  element("#expedition-dig")?.addEventListener("click", () => requestExcavate(selectedTile.x, selectedTile.y));
   ui.resupply?.addEventListener("click", resupplyFocus);
   element("#expedition-map-controls")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-expedition-move]");
@@ -213,7 +276,7 @@ export function createExpeditionController({ root = document, townController, on
       renderer.stop();
     },
     snapshot: () => structuredClone(state),
-    excavate: attemptExcavate,
+    excavate: requestExcavate,
     resupply: resupplyFocus,
     destroy: () => renderer.destroy()
   };

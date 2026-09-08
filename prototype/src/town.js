@@ -8,6 +8,8 @@ export const TOWN_GAME_VERSION = APP_VERSION;
 export const DISTRICT_RESTORATION_GOAL = 30;
 export const EXPEDITION_FOCUS_RESTORE = 6;
 export const EXPEDITION_FOCUS_MOONLEAF_COST = 1;
+export const COMMISSION_MOONLEAF_COST = 3;
+export const MINIMUM_DAILY_WISHES_FOR_REST = 2;
 
 export const RESOURCE_LABELS = {
   coins: "星幣",
@@ -48,7 +50,7 @@ export const BUILDINGS = {
 
 export const DAILY_WISHES = [
   { id: "garden", title: "照料月芽藥園", detail: "採收一次今日藥草" },
-  { id: "commission", title: "完成居民委託", detail: "交付 3 片月芽葉" },
+  { id: "commission", title: "完成居民委託（選做）", detail: `交付 ${COMMISSION_MOONLEAF_COST} 片月芽葉，換建設材料` },
   { id: "clinic", title: "完成遊戲委託", detail: "完成一場小遊戲挑戰" }
 ];
 
@@ -295,6 +297,7 @@ export function canAfford(state, cost) {
 
 export function formatCost(cost) {
   return Object.entries(cost)
+    .filter(([, amount]) => Number(amount) > 0)
     .map(([resource, amount]) => `${RESOURCE_LABELS[resource]} ${amount}`)
     .join(" · ");
 }
@@ -359,8 +362,8 @@ export function tendGarden(state) {
 
 export function fulfillCommission(state) {
   if (state.daily.commission) return outcome(state, false, "今天的居民委託已經送達。");
-  const cost = { moonleaf: 3 };
-  if (!canAfford(state, cost)) return outcome(state, false, "還需要 3 片月芽葉；先去藥園採收。");
+  const cost = { moonleaf: COMMISSION_MOONLEAF_COST };
+  if (!canAfford(state, cost)) return outcome(state, false, `還需要 ${COMMISSION_MOONLEAF_COST} 片月芽葉；這份委託可以留到明日，不會阻止你進入下一日。`);
 
   const next = clone(state);
   const coins = 35 + Math.max(0, next.buildings.workshop - 1) * 10;
@@ -384,7 +387,7 @@ export function resupplyExpeditionFocus(state) {
     return outcome(state, false, "羅盤專注已充足；先把月芽葉留給下一段路。");
   }
   if (state.resources.moonleaf < EXPEDITION_FOCUS_MOONLEAF_COST) {
-    return outcome(state, false, "需要 1 片月芽葉。到小鎮的月芽藥園採收；若今天已採收，完成星願並前往明日。");
+    return outcome(state, false, `需要 1 片月芽葉。到小鎮的月芽藥園採收；今日委託是選做，完成任 ${MINIMUM_DAILY_WISHES_FOR_REST} 項星願即可進入下一日。`);
   }
 
   const next = clone(state);
@@ -394,7 +397,8 @@ export function resupplyExpeditionFocus(state) {
     ...next.expedition,
     focus: focus + restored
   });
-  return collectionOutcome(state, next, `月芽暖茶回到羅盤：遠征專注 +${restored}。`, {
+  const commissionDeferred = !state.daily.commission && next.resources.moonleaf < COMMISSION_MOONLEAF_COST;
+  return collectionOutcome(state, next, `月芽暖茶回到羅盤：遠征專注 +${restored}。${commissionDeferred ? " 今日委託材料不足，可留到明日處理。" : ""}`, {
     moonleaf: -EXPEDITION_FOCUS_MOONLEAF_COST,
     expeditionFocus: restored
   });
@@ -462,17 +466,23 @@ export function recordExpeditionProgress(state, expedition, event = {}) {
   next.lifetime.relicsFound += discoveries.length;
   if (becameComplete) next.lifetime.completedExpeditions += 1;
 
-  const reward = discoveries.reduce((total, target) => ({
+  const discoveryReward = discoveries.reduce((total, target) => ({
     coins: total.coins + target.reward.coins,
     starlight: total.starlight + target.reward.starlight
   }), { coins: 0, starlight: 0 });
-  next.resources.coins += reward.coins;
-  next.resources.starlight += reward.starlight;
+  const reward = Object.fromEntries(
+    Object.keys(next.resources).map((resource) => [
+      resource,
+      integer(event.reward?.[resource], discoveryReward[resource] ?? 0)
+    ])
+  );
+  for (const [resource, amount] of Object.entries(reward)) next.resources[resource] += amount;
 
   const discoveryNames = discoveries.map((target) => target.name);
+  const rewardText = formatCost(reward);
   const message = discoveryNames.length
-    ? `遠征成果已收下：${discoveryNames.join("、")}；星幣 +${reward.coins}、星砂 +${reward.starlight}。`
-    : event.message ?? "遠征地圖已自動保存。";
+    ? `遠征成果已收下：${discoveryNames.join("、")}；${rewardText}。`
+    : `${event.message ?? "遠征地圖已自動保存。"} 獲得 ${rewardText}。`;
   return collectionOutcome(state, next, message, {
     ...reward,
     discoveries: discoveryNames,
@@ -483,23 +493,25 @@ export function recordExpeditionProgress(state, expedition, event = {}) {
 
 export function claimDailyReward(state) {
   if (state.daily.rewardClaimed) return outcome(state, false, "今天的星願禮已經領取。");
-  if (completedWishCount(state) < DAILY_WISHES.length) {
-    return outcome(state, false, "完成三項星願後，就能領取今天的修復禮。");
+  const completed = completedWishCount(state);
+  if (completed < MINIMUM_DAILY_WISHES_FOR_REST) {
+    return outcome(state, false, `完成任 ${MINIMUM_DAILY_WISHES_FOR_REST} 項星願後，就能領取歇息禮並進入下一日。`);
   }
 
   const next = clone(state);
-  next.resources.coins += 60;
-  next.resources.timber += 2;
-  next.resources.starlight += 1;
-  next.restoration += 3;
+  const fullDay = completed === DAILY_WISHES.length;
+  const reward = fullDay
+    ? { coins: 60, timber: 2, starlight: 1, restoration: 3 }
+    : { coins: 25, timber: 1, starlight: 0, restoration: 1 };
+  next.resources.coins += reward.coins;
+  next.resources.timber += reward.timber;
+  next.resources.starlight += reward.starlight;
+  next.restoration += reward.restoration;
   next.daily.rewardClaimed = true;
-  next.lifetime.dailyRewards += 1;
-  return collectionOutcome(state, next, "三枚星願章已集齊：獲得 60 星幣、2 份暖木與 1 份星砂。", {
-    coins: 60,
-    timber: 2,
-    starlight: 1,
-    restoration: 3
-  });
+  if (fullDay) next.lifetime.dailyRewards += 1;
+  return collectionOutcome(state, next, fullDay
+    ? "三枚星願章已集齊：獲得 60 星幣、2 份暖木與 1 份星砂。"
+    : "兩項星願已完成：領取歇息禮並保留居民委託到明日。", reward);
 }
 
 export function advanceTownDay(state) {
@@ -628,8 +640,13 @@ export function createTownController({ root = document, storage = globalThis.loc
     const count = completedWishCount(state);
     if (ui.wishCount) ui.wishCount.textContent = `${count} / ${DAILY_WISHES.length}`;
     if (ui.claimReward) {
-      ui.claimReward.disabled = count < DAILY_WISHES.length || state.daily.rewardClaimed;
-      ui.claimReward.textContent = state.daily.rewardClaimed ? "今日星願禮已領取" : "領取三章修復禮";
+      const fullDay = count === DAILY_WISHES.length;
+      ui.claimReward.disabled = count < MINIMUM_DAILY_WISHES_FOR_REST || state.daily.rewardClaimed;
+      ui.claimReward.textContent = state.daily.rewardClaimed
+        ? "今日歇息禮已領取"
+        : fullDay
+        ? "領取三章修復禮"
+        : "領取兩章歇息禮";
     }
     if (ui.nextDay) ui.nextDay.disabled = !state.daily.rewardClaimed;
   }
@@ -688,7 +705,7 @@ export function createTownController({ root = document, storage = globalThis.loc
     }
     if (ui.commissionAction) {
       ui.commissionAction.disabled = state.daily.commission;
-      ui.commissionAction.textContent = state.daily.commission ? "今日已送達" : "交付 3 片月芽葉";
+      ui.commissionAction.textContent = state.daily.commission ? "今日已送達" : `交付 ${COMMISSION_MOONLEAF_COST} 片月芽葉（選做）`;
     }
     if (ui.lifetime) {
       ui.lifetime.textContent = `已完成 ${state.lifetime.shifts} 場 · 配成 ${state.lifetime.pairsMatched} 組 · 遠征 ${state.lifetime.expeditionDigs} 格`;

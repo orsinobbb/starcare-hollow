@@ -133,6 +133,23 @@ test("three daily wishes unlock a reward and the next player-controlled day", ()
   assert.equal(nextDay.state.daily.clinic, false);
 });
 
+test("using every leaf for expedition focus never locks tomorrow behind the optional commission", () => {
+  let state = tendGarden(createTownState()).state;
+  state.expedition.focus = 0;
+  for (let cup = 0; cup < 4; cup += 1) state = resupplyExpeditionFocus(state).state;
+  assert.equal(state.resources.moonleaf, 0);
+  assert.equal(state.daily.commission, false);
+
+  state = recordClinicShift(state, { id: "focus-first-day", completed: 1, matched: 4, stars: 1 }).state;
+  const rest = claimDailyReward(state);
+  assert.equal(rest.ok, true, "garden plus clinic satisfy the safe two-wish exit");
+  assert.equal(rest.state.daily.rewardClaimed, true);
+  assert.match(rest.message, /居民委託/);
+  const nextDay = advanceTownDay(rest.state);
+  assert.equal(nextDay.ok, true);
+  assert.equal(nextDay.state.day, 2);
+});
+
 test("building upgrades spend resources and permanently change their level", () => {
   const state = createTownState();
   const upgraded = upgradeBuilding(state, "garden");
@@ -173,8 +190,8 @@ test("an expedition discovery persists with the town and becomes permanent colle
   assert.equal(result.ok, true);
   assert.equal(result.state.lifetime.expeditionDigs, 1);
   assert.equal(result.state.lifetime.relicsFound, 1);
-  assert.equal(result.state.resources.coins, 108);
-  assert.equal(result.state.resources.starlight, 1);
+  assert.equal(result.state.resources.coins, town.resources.coins + excavation.event.reward.coins);
+  assert.equal(result.state.resources.starlight, town.resources.starlight + excavation.event.reward.starlight);
   assert.ok(result.state.collections.unlocked.includes("starsand-compass"));
   assert.equal(town.expedition.foundTargetIds.length, 0, "the previous town snapshot stays immutable");
 });

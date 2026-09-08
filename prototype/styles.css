@@ -3716,6 +3716,12 @@ body.is-board-dragging {
   animation: expedition-stage-aim 0.62s ease-in-out infinite alternate;
 }
 
+.expedition-stage[data-stage="walk"] > span,
+.expedition-stage[data-stage="queued"] > span {
+  color: #c9f7df;
+  animation: expedition-stage-walk 0.45s ease-in-out infinite alternate;
+}
+
 .expedition-stage[data-stage="impact"] > span {
   animation: expedition-stage-impact 0.18s ease-out 2;
 }
@@ -3730,6 +3736,11 @@ body.is-board-dragging {
   animation: expedition-stage-discovery 0.7s ease-in-out infinite alternate;
 }
 
+.expedition-stage[data-stage="reward"] > span {
+  color: #fff4bb;
+  animation: expedition-stage-reward 0.5s ease-out infinite alternate;
+}
+
 .expedition-stage[data-stage="complete"] > span {
   color: #d9ffd2;
   background: rgba(138, 227, 155, 0.15);
@@ -3739,6 +3750,11 @@ body.is-board-dragging {
 @keyframes expedition-stage-aim {
   from { transform: translateY(-1px); }
   to { transform: translateY(2px); }
+}
+
+@keyframes expedition-stage-walk {
+  from { transform: translateX(-2px); }
+  to { transform: translateX(3px); }
 }
 
 @keyframes expedition-stage-impact {
@@ -3755,6 +3771,11 @@ body.is-board-dragging {
 @keyframes expedition-stage-discovery {
   from { transform: scale(0.95) rotate(-5deg); box-shadow: 0 0 0 rgba(255, 231, 139, 0); }
   to { transform: scale(1.08) rotate(5deg); box-shadow: 0 0 22px rgba(255, 231, 139, 0.62); }
+}
+
+@keyframes expedition-stage-reward {
+  from { transform: translateY(2px) scale(0.95); box-shadow: 0 0 0 rgba(255, 231, 139, 0); }
+  to { transform: translateY(-2px) scale(1.08); box-shadow: 0 0 20px rgba(255, 231, 139, 0.52); }
 }
 
 .expedition-map-help,
@@ -3809,6 +3830,16 @@ body.is-board-dragging {
   color: #d9e4f1;
   font-size: 0.78rem;
   line-height: 1.55;
+}
+
+.excavation-card > .expedition-queue {
+  min-height: 0;
+  padding: 0.48rem 0.58rem;
+  margin-top: 0.55rem;
+  color: #fff1b9;
+  background: rgba(255, 224, 130, 0.09);
+  border: 1px solid rgba(255, 224, 130, 0.25);
+  border-radius: 9px;
 }
 
 .compass-ring {

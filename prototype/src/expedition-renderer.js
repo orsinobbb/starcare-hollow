@@ -4,9 +4,11 @@ const MAX_PARTICLES = 40;
 const TAP_DISTANCE_PX = 8;
 const FIXED_STEP_SECONDS = 1 / 60;
 const EXCAVATION_TIMELINE = {
+  walk: 0.42,
   aim: 0.22,
   impact: 0.18,
   reveal: 0.36,
+  reward: 0.56,
   settle: 0.28,
   discovery: 0.68
 };
@@ -54,6 +56,8 @@ export class ExpeditionRenderer {
     this.hoverTile = null;
     this.particles = [];
     this.excavation = null;
+    this.minerTile = { x: 0, y: 0 };
+    this.queuedTile = null;
     this.shake = { x: 0, y: 0, energy: 0 };
     this.running = false;
     this.frameHandle = null;
@@ -78,6 +82,13 @@ export class ExpeditionRenderer {
     this.state = state;
     if (!isInBounds(state, this.keyboardTile.x, this.keyboardTile.y)) this.keyboardTile = { x: 0, y: 0 };
     this.constrainCamera();
+    this.render();
+  }
+
+  setQueuedTile(tile) {
+    this.queuedTile = tile && this.state && isInBounds(this.state, tile.x, tile.y)
+      ? { x: tile.x, y: tile.y }
+      : null;
     this.render();
   }
 
@@ -169,13 +180,15 @@ export class ExpeditionRenderer {
   timelineFor(event) {
     const multiplier = this.reducedMotion ? 0.52 : 1;
     const timeline = {
+      walk: EXCAVATION_TIMELINE.walk * multiplier,
       aim: EXCAVATION_TIMELINE.aim * multiplier,
       impact: EXCAVATION_TIMELINE.impact * multiplier,
       reveal: EXCAVATION_TIMELINE.reveal * multiplier,
+      reward: EXCAVATION_TIMELINE.reward * multiplier,
       settle: EXCAVATION_TIMELINE.settle * multiplier,
       discovery: event.type === "discovery" ? EXCAVATION_TIMELINE.discovery * multiplier : 0
     };
-    timeline.total = timeline.aim + timeline.impact + timeline.reveal + timeline.settle + timeline.discovery;
+    timeline.total = timeline.walk + timeline.aim + timeline.impact + timeline.reveal + timeline.discovery + timeline.reward + timeline.settle;
     return timeline;
   }
 
@@ -190,11 +203,15 @@ export class ExpeditionRenderer {
     if (!animation) return;
     animation.elapsed += delta;
     const { timeline, event, tile } = animation;
-    const impactAt = timeline.aim;
+    const walkAt = timeline.walk;
+    const impactAt = walkAt + timeline.aim;
     const revealAt = impactAt + timeline.impact;
     const discoveryAt = revealAt + timeline.reveal;
+    const rewardAt = discoveryAt + timeline.discovery;
 
-    if (animation.elapsed < impactAt) {
+    if (animation.elapsed < walkAt) {
+      this.emitExcavationStage("walk");
+    } else if (animation.elapsed < impactAt) {
       this.emitExcavationStage("aim");
     } else if (animation.elapsed < revealAt) {
       this.emitExcavationStage("impact");
@@ -209,12 +226,18 @@ export class ExpeditionRenderer {
         animation.revealBurst = true;
         this.spawnBurst(tile, event.terrain, event.type === "discovery" ? 12 : 7, "shard");
       }
-    } else if (event.type === "discovery" && animation.elapsed < timeline.total - timeline.settle) {
+    } else if (event.type === "discovery" && animation.elapsed < rewardAt) {
       this.emitExcavationStage("discovery");
       if (!animation.discoveryBurst) {
         animation.discoveryBurst = true;
         this.shake.energy = this.reducedMotion ? 0 : 1.6;
         this.spawnBurst(tile, event.terrain, 18, "star");
+      }
+    } else if (animation.elapsed < rewardAt + timeline.reward) {
+      this.emitExcavationStage("reward");
+      if (!animation.rewardBurst) {
+        animation.rewardBurst = true;
+        this.spawnBurst(tile, event.terrain, event.type === "discovery" ? 16 : 9, "star");
       }
     } else {
       this.emitExcavationStage("settle");
@@ -229,6 +252,7 @@ export class ExpeditionRenderer {
     const animation = this.excavation;
     if (!animation) return;
     this.emitExcavationStage("settle");
+    this.minerTile = { ...animation.tile };
     this.excavation = null;
     this.shake = { x: 0, y: 0, energy: 0 };
     animation.resolve?.();
@@ -291,7 +315,7 @@ export class ExpeditionRenderer {
   }
 
   handlePointerDown(event) {
-    if (!this.state || this.excavation || event.button > 0) return;
+    if (!this.state || event.button > 0) return;
     this.canvas.focus({ preventScroll: true });
     this.canvas.setPointerCapture(event.pointerId);
     this.pointer = {
@@ -360,7 +384,7 @@ export class ExpeditionRenderer {
   }
 
   handleKeydown(event) {
-    if (!this.state || this.excavation) return;
+    if (!this.state) return;
     const steps = {
       ArrowUp: [0, -1],
       ArrowDown: [0, 1],
@@ -389,6 +413,7 @@ export class ExpeditionRenderer {
     return new Promise((resolve) => {
       this.excavation = {
         tile,
+        origin: { ...this.minerTile },
         event,
         timeline,
         elapsed: 0,
@@ -396,9 +421,10 @@ export class ExpeditionRenderer {
         impactBurst: false,
         revealBurst: false,
         discoveryBurst: false,
+        rewardBurst: false,
         resolve
       };
-      this.emitExcavationStage("aim");
+      this.emitExcavationStage("walk");
       this.render();
       if (!this.running) {
         window.setTimeout(() => {
@@ -461,6 +487,8 @@ export class ExpeditionRenderer {
         this.drawTile(context, x, y, left, top, size, revealed, selectable);
       }
     }
+    this.drawMiner(context);
+    this.drawRewardPopup(context);
     context.restore();
   }
 
@@ -527,6 +555,7 @@ export class ExpeditionRenderer {
 
     const animation = this.activeExcavationAt(x, y);
     if (animation) this.drawExcavationOverlay(context, animation, left, top, size, radius);
+    if (this.queuedTile?.x === x && this.queuedTile?.y === y) this.drawQueuedMarker(context, left, top, size, radius);
   }
 
   activeExcavationAt(x, y) {
@@ -538,7 +567,7 @@ export class ExpeditionRenderer {
   revealProgress(animation) {
     if (!animation) return 1;
     const { timeline } = animation;
-    const revealStart = timeline.aim + timeline.impact;
+    const revealStart = timeline.walk + timeline.aim + timeline.impact;
     return clamp((animation.elapsed - revealStart) / Math.max(0.001, timeline.reveal), 0, 1);
   }
 
@@ -546,7 +575,7 @@ export class ExpeditionRenderer {
     if (!animation) return 1;
     const reveal = this.revealProgress(animation);
     if (animation.event.type !== "discovery") return 1;
-    const discoveryStart = animation.timeline.aim + animation.timeline.impact + animation.timeline.reveal * 0.58;
+    const discoveryStart = animation.timeline.walk + animation.timeline.aim + animation.timeline.impact + animation.timeline.reveal * 0.58;
     return reveal * clamp((animation.elapsed - discoveryStart) / Math.max(0.001, animation.timeline.discovery * 0.48), 0, 1);
   }
 
@@ -555,7 +584,8 @@ export class ExpeditionRenderer {
     const centerX = left + size / 2;
     const centerY = top + size / 2;
     const { timeline, elapsed, event } = animation;
-    const impactStart = timeline.aim;
+    const aimStart = timeline.walk;
+    const impactStart = aimStart + timeline.aim;
     const revealStart = impactStart + timeline.impact;
     const discoveryStart = revealStart + timeline.reveal;
 
@@ -575,8 +605,8 @@ export class ExpeditionRenderer {
       context.restore();
     }
 
-    const aimProgress = clamp(elapsed / Math.max(0.001, timeline.aim), 0, 1);
-    if (elapsed < revealStart) {
+    const aimProgress = clamp((elapsed - aimStart) / Math.max(0.001, timeline.aim), 0, 1);
+    if (elapsed >= aimStart && elapsed < revealStart) {
       this.drawTargetRing(context, centerX, centerY, size, aimProgress, elapsed >= impactStart);
       this.drawSpade(context, centerX, centerY, size, aimProgress, elapsed >= impactStart);
     }
@@ -609,6 +639,122 @@ export class ExpeditionRenderer {
       context.fill();
       context.restore();
     }
+  }
+
+  drawQueuedMarker(context, left, top, size, radius) {
+    const pulse = 0.5 + Math.sin(performance.now() / 180) * 0.14;
+    context.save();
+    context.globalAlpha = pulse;
+    context.setLineDash([Math.max(3, size * 0.09), Math.max(2, size * 0.06)]);
+    context.strokeStyle = "#fff0a5";
+    context.lineWidth = Math.max(1.5, size * 0.04);
+    drawRoundedRect(context, left - 4, top - 4, size + 8, size + 8, radius + 4);
+    context.stroke();
+    context.setLineDash([]);
+    context.globalAlpha = 0.94;
+    context.fillStyle = "#fff7cf";
+    context.font = `bold ${Math.max(9, size * 0.16)}px system-ui, sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("下一鏟", left + size / 2, top - Math.max(8, size * 0.1));
+    context.restore();
+  }
+
+  drawMiner(context) {
+    const animation = this.excavation;
+    let tile = this.minerTile;
+    let working = false;
+    if (animation) {
+      const travel = clamp(animation.elapsed / Math.max(0.001, animation.timeline.walk), 0, 1);
+      const progress = travel * travel * (3 - 2 * travel);
+      tile = {
+        x: animation.origin.x + (animation.tile.x - animation.origin.x) * progress,
+        y: animation.origin.y + (animation.tile.y - animation.origin.y) * progress
+      };
+      working = travel >= 1 && animation.stage !== "reward" && animation.stage !== "settle";
+    }
+    const screen = this.tileToScreen(tile.x, tile.y);
+    const size = this.tileSize * 0.42;
+    const bob = working ? Math.sin(performance.now() / 76) * size * 0.035 : Math.sin(performance.now() / 300) * size * 0.02;
+    context.save();
+    context.translate(screen.x, screen.y + size * 0.12 + bob);
+    context.shadowColor = "rgba(4, 12, 30, 0.5)";
+    context.shadowBlur = size * 0.18;
+    context.shadowOffsetY = size * 0.08;
+    context.fillStyle = "rgba(8, 18, 40, 0.48)";
+    context.beginPath();
+    context.ellipse(0, size * 0.35, size * 0.33, size * 0.11, 0, 0, Math.PI * 2);
+    context.fill();
+    context.shadowBlur = 0;
+    context.fillStyle = "#5d9b90";
+    drawRoundedRect(context, -size * 0.22, -size * 0.03, size * 0.44, size * 0.39, size * 0.12);
+    context.fill();
+    context.strokeStyle = "#d8f3d4";
+    context.lineWidth = Math.max(1, size * 0.035);
+    context.stroke();
+    context.fillStyle = "#ffe1bb";
+    context.beginPath();
+    context.arc(0, -size * 0.2, size * 0.2, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#f2bc48";
+    context.beginPath();
+    context.arc(0, -size * 0.28, size * 0.23, Math.PI, 0);
+    context.lineTo(size * 0.2, -size * 0.16);
+    context.lineTo(-size * 0.2, -size * 0.16);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = "#88583d";
+    context.lineWidth = Math.max(1.3, size * 0.065);
+    context.lineCap = "round";
+    context.beginPath();
+    const swing = working ? Math.sin(performance.now() / 74) * size * 0.12 : 0;
+    context.moveTo(size * 0.1, -size * 0.03);
+    context.lineTo(size * 0.42, -size * 0.32 + swing);
+    context.stroke();
+    context.fillStyle = "#c8e0ea";
+    context.beginPath();
+    context.arc(size * 0.43, -size * 0.33 + swing, size * 0.08, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+
+  drawRewardPopup(context) {
+    const animation = this.excavation;
+    if (!animation) return;
+    const { timeline, event, elapsed, tile } = animation;
+    const rewardStart = timeline.walk + timeline.aim + timeline.impact + timeline.reveal + timeline.discovery;
+    if (elapsed < rewardStart || !event.reward) return;
+    const progress = clamp((elapsed - rewardStart) / Math.max(0.001, timeline.reward), 0, 1);
+    const items = Object.entries(event.reward)
+      .filter(([, amount]) => amount > 0)
+      .slice(0, 3)
+      .map(([resource, amount]) => ({ coins: "星幣", moonleaf: "月芽葉", starlight: "星光" }[resource] ?? resource) + ` +${amount}`);
+    if (!items.length) return;
+    const screen = this.tileToScreen(tile.x, tile.y);
+    const rise = this.tileSize * (0.44 + progress * 0.3);
+    const alpha = clamp(Math.min(progress * 3, (1 - progress) * 3 + 0.3), 0, 1);
+    context.save();
+    context.globalAlpha = alpha;
+    context.font = `bold ${Math.max(11, this.tileSize * 0.18)}px system-ui, sans-serif`;
+    const text = items.join("  ");
+    const width = Math.min(this.width - 16, context.measureText(text).width + this.tileSize * 0.28);
+    const height = Math.max(25, this.tileSize * 0.42);
+    const x = clamp(screen.x - width / 2, 8, this.width - width - 8);
+    const y = clamp(screen.y - rise, height + 6, this.height - 8);
+    const fill = context.createLinearGradient(x, y - height, x, y);
+    fill.addColorStop(0, "rgba(27, 58, 81, 0.98)");
+    fill.addColorStop(1, "rgba(10, 26, 52, 0.96)");
+    drawRoundedRect(context, x, y - height, width, height, height / 2);
+    context.fillStyle = fill;
+    context.fill();
+    context.strokeStyle = "rgba(255, 235, 152, 0.88)";
+    context.lineWidth = 1.2;
+    context.stroke();
+    context.fillStyle = "#fff5bd";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(text, x + width / 2, y - height / 2 + 0.5);
+    context.restore();
   }
 
   drawTargetRing(context, x, y, size, progress, impacted) {

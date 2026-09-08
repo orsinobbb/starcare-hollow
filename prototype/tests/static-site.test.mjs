@@ -110,6 +110,7 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(html, /id="expedition-canvas"[^>]*tabindex="0"/);
   assert.match(html, /id="expedition-stage"[^>]*role="status"/);
   assert.match(html, /id="expedition-map-help"/);
+  assert.match(html, /id="expedition-queue"/);
   assert.match(html, /id="expedition-resupply"/);
   assert.match(css, /#expedition-canvas[\s\S]*touch-action:\s*none/);
   assert.match(css, /#expedition-canvas[\s\S]*height:\s*clamp/);
@@ -119,12 +120,18 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(renderer, /MAX_PARTICLES/);
   assert.match(renderer, /EXCAVATION_TIMELINE/);
   assert.match(renderer, /playExcavation/);
+  assert.match(renderer, /setQueuedTile/);
+  assert.match(renderer, /drawMiner/);
+  assert.match(renderer, /drawRewardPopup/);
   assert.match(renderer, /drawSpade/);
   assert.match(renderer, /drawExcavationOverlay/);
   assert.match(css, /\.expedition-stage/);
   assert.match(css, /@keyframes\s+expedition-stage-impact/);
   assert.match(css, /prefers-reduced-motion[\s\S]*\.expedition-stage > span/);
   assert.match(controller, /isAnimating/);
+  assert.match(controller, /queueExcavation/);
+  assert.match(controller, /requestExcavate/);
+  assert.match(controller, /下一鏟/);
   assert.match(controller, /await renderer\.playExcavation/);
   assert.match(controller, /resupplyExpeditionFocus/);
   assert.match(controller, /月芽暖茶/);

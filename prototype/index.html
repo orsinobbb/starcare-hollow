@@ -9,7 +9,7 @@
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.6.2" />
+    <link rel="stylesheet" href="./styles.css?v=0.6.3" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.6.2</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.6.3</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -170,10 +170,10 @@
                     <strong>回響工坊</strong>
                     <span class="level-chip" data-building-level="workshop">Lv.1</span>
                   </div>
-                  <p>把藥園產物交給托比，換回建設所需的星幣與暖木。</p>
+                  <p>把藥園產物交給托比，換回建設所需的星幣與暖木；可留到明日，不會卡住日程。</p>
                   <p class="building-benefit" data-building-benefit="workshop">委託可獲得 35 星幣</p>
                   <div class="building-actions">
-                    <button id="commission-action" class="primary-button compact" type="button">交付 3 片月芽葉</button>
+                    <button id="commission-action" class="primary-button compact" type="button">交付 3 片月芽葉（選做）</button>
                     <button class="secondary-button compact" data-upgrade-building="workshop" type="button">升級 Lv.2</button>
                   </div>
                   <small class="building-cost" data-building-cost="workshop">下次升級：星幣 110 · 暖木 3</small>
@@ -218,13 +218,13 @@
                 </div>
                 <strong id="town-wish-count">0 / 3</strong>
               </div>
-              <p>沒有連續登入要求；完成後由你決定何時進入下一日。</p>
+              <p>完成任兩項星願即可安心進入下一日；三項全完成才有完整修復禮，居民委託可選擇保留到明日。</p>
               <ol id="town-wish-list" class="town-wish-list"></ol>
               <div class="wish-reward">
-                <span>三章獎勵</span>
-                <strong>60 星幣 · 暖木 2 · 星砂 1</strong>
+                <span>兩章可歇息・三章完整修復</span>
+                <strong>兩章：25 星幣 · 暖木 1　／　三章：60 星幣 · 暖木 2 · 星砂 1</strong>
               </div>
-              <button id="claim-town-reward" class="primary-button" type="button" disabled>領取三章修復禮</button>
+              <button id="claim-town-reward" class="primary-button" type="button" disabled>領取兩章歇息禮</button>
               <button id="next-town-day" class="secondary-button" type="button" disabled>進入下一日</button>
             </aside>
           </div>
@@ -247,7 +247,7 @@
             <div>
               <p class="eyebrow">星砂群島 · 可玩技術切片</p>
               <h2 id="expedition-title">星脈遠征</h2>
-              <p>點已開啟格旁邊的迷霧調查；每次翻開地表後，羅盤會提示下一件主要寶物有多近。專注不足時，用小鎮藥園採收的月芽葉補給。</p>
+              <p>點已開啟格旁邊的迷霧，派遣挖礦者逐格調查；每格固定帶回材料，羅盤則提示主要寶物有多近。專注不足時，用小鎮藥園採收的月芽葉補給。</p>
             </div>
             <button id="expedition-return" class="secondary-button" type="button">帶著成果回小鎮</button>
           </section>
@@ -264,9 +264,9 @@
               <canvas id="expedition-canvas" tabindex="0" aria-label="星砂群島探索地圖" aria-describedby="expedition-map-help"></canvas>
               <div id="expedition-stage" class="expedition-stage" data-stage="ready" role="status" aria-live="polite">
                 <span aria-hidden="true">⌁</span>
-                <p>每一次調查都會先呈現定位、翻土與地表回應。</p>
+                <p>挖礦者會前往目標、落鏟、翻土，再把每格成果清楚交到你手上。</p>
               </div>
-              <p id="expedition-map-help" class="expedition-map-help">地圖內：單指拖曳移動鏡頭，輕點相鄰迷霧格調查。鍵盤可用方向鍵選格、Enter 調查。遊戲採固定比例，雙指不會改變世界或按鈕位置。</p>
+              <p id="expedition-map-help" class="expedition-map-help">地圖內：單指拖曳移動鏡頭，輕點相鄰迷霧格派遣挖礦者。進行中可標記一格「下一鏟」；挖礦者收下目前成果後就會前往。每格都有材料，遺物是額外大獎。鍵盤可用方向鍵選格、Enter 調查；世界採固定比例，雙指不會改變世界或按鈕位置。</p>
               <p id="expedition-log" class="expedition-log" role="status" aria-live="polite">羅盤待命：從起點相鄰的格子開始調查。</p>
             </section>
 
@@ -290,7 +290,8 @@
                 <p class="eyebrow">本次操作</p>
                 <h3 id="selected-title"><span id="expedition-selected">座標 2 · 1</span></h3>
                 <p id="expedition-selected-detail">星砂 · 調查消耗 1 專注</p>
-                <button id="expedition-dig" class="primary-button" type="button">調查星砂（-1）</button>
+                <p id="expedition-queue" class="expedition-queue" aria-live="polite">下一鏟：尚未標記</p>
+                <button id="expedition-dig" class="primary-button" type="button">派遣挖礦者：星砂（-1）</button>
                 <div id="expedition-map-controls" class="expedition-map-controls" aria-label="選擇地圖格子">
                   <span></span><button type="button" data-expedition-move="0,-1" aria-label="往上選格">↑</button><span></span>
                   <button type="button" data-expedition-move="-1,0" aria-label="往左選格">←</button><span class="map-control-center" aria-hidden="true">◎</span><button type="button" data-expedition-move="1,0" aria-label="往右選格">→</button>
@@ -302,8 +303,8 @@
                 <strong>安心探索</strong>
                 <ul>
                   <li>已翻開地格與找到的寶物永久保存。</li>
-                  <li>專注不足時用月芽暖茶補給；月芽葉來自小鎮藥園。</li>
-                  <li>每次挖掘都先顯示翻土與回饋，再更新狀態。</li>
+                  <li>專注不足時用月芽暖茶補給；月芽葉來自小鎮藥園與藤蔓地層，居民委託可留到明日。</li>
+                  <li>每次挖掘都先顯示移動、翻土與每格回饋；收下成果後才開始下一鏟。</li>
                 </ul>
               </section>
             </aside>
@@ -495,6 +496,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.6.2"></script>
+    <script type="module" src="./src/app.js?v=0.6.3"></script>
   </body>
 </html>

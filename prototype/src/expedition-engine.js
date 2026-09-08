@@ -7,9 +7,9 @@ export const EXPEDITION_HEIGHT = 8;
 export const EXPEDITION_FOCUS_MAX = 30;
 
 export const TERRAIN = Object.freeze({
-  sand: { id: "sand", name: "星砂", cost: 1, symbol: "·" },
-  vine: { id: "vine", name: "月藤", cost: 2, symbol: "⌇" },
-  crystal: { id: "crystal", name: "晶岩", cost: 3, symbol: "✧" }
+  sand: { id: "sand", name: "星砂", cost: 1, symbol: "·", reward: { coins: 4 } },
+  vine: { id: "vine", name: "月藤", cost: 2, symbol: "⌇", reward: { coins: 6, moonleaf: 1 } },
+  crystal: { id: "crystal", name: "晶岩", cost: 3, symbol: "✧", reward: { coins: 9, starlight: 1 } }
 });
 
 const TARGETS = Object.freeze([
@@ -20,6 +20,17 @@ const TARGETS = Object.freeze([
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function combineRewards(...rewards) {
+  const next = {};
+  for (const reward of rewards) {
+    for (const [resource, amount] of Object.entries(reward ?? {})) {
+      const safeAmount = integer(amount, 0);
+      if (safeAmount > 0) next[resource] = (next[resource] ?? 0) + safeAmount;
+    }
+  }
+  return next;
 }
 
 function integer(value, fallback, minimum = 0) {
@@ -191,7 +202,6 @@ export function compassClue(state, x, y) {
 
 export function canExcavate(state, x, y) {
   if (!isInBounds(state, x, y)) return { ok: false, message: "那裡不在這座浮島上。" };
-  if (state.completed) return { ok: false, message: "主要寶物都已尋回，這張地圖可以安心保存。" };
   if (isRevealed(state, x, y)) return { ok: false, message: "這一格已經調查過了。" };
   if (!isAdjacentToRevealed(state, x, y)) return { ok: false, message: "只能從已開啟格的上下左右繼續探索。" };
   const terrain = terrainAt(state, x, y);
@@ -216,12 +226,14 @@ export function excavate(state, x, y) {
     next.foundTargetIds.push(target.id);
     discovery = target;
   }
+  const newlyCompleted = !state.completed && next.foundTargetIds.length === next.targets.length;
   next.completed = next.foundTargetIds.length === next.targets.length;
   next.lastClue = compassClue(next, x, y);
+  const reward = combineRewards(terrain.reward, discovery?.reward);
 
   const message = discovery
-    ? `找到「${discovery.name}」！${next.completed ? " 三件主要寶物已全數定位。" : " 羅盤正在指向下一件寶物。"}`
-    : `${terrain.name}已翻開：${next.lastClue.title}。`;
+    ? `找到「${discovery.name}」！${newlyCompleted ? " 三件主要寶物已全數定位，剩餘地層仍可挖取材料。" : " 羅盤正在指向下一件寶物。"}`
+    : `${terrain.name}已翻開：${next.lastClue.title}${next.completed ? "，這一格的材料已收下。" : "。"}`;
 
   return {
     ok: true,
@@ -233,8 +245,9 @@ export function excavate(state, x, y) {
       y,
       terrain,
       discovery,
+      reward,
       clue: next.lastClue,
-      completed: next.completed
+      completed: newlyCompleted
     }
   };
 }

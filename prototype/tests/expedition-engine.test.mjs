@@ -47,6 +47,20 @@ test("excavation is adjacency-gated and pays terrain focus only after a legal mo
   assert.equal(result.state.revealed.includes("1,0"), true);
   assert.equal(result.state.focus, EXPEDITION_FOCUS_MAX - permitted.terrain.cost);
   assert.equal(state.revealed.includes("1,0"), false, "the input state remains immutable");
+  assert.deepEqual(result.event.reward, { coins: 4 }, "every ordinary grid gives a visible terrain reward");
+});
+
+test("terrain rewards make every grid materially useful and relic rewards are extra", () => {
+  const state = createExpeditionState("terrain-reward-test");
+  state.terrain["1,0"] = "vine";
+  const vine = excavate(state, 1, 0);
+  assert.deepEqual(vine.event.reward, { coins: 6, moonleaf: 1 });
+
+  const relicState = createExpeditionState("relic-reward-test");
+  relicState.terrain["1,0"] = "crystal";
+  relicState.targets[0] = { ...relicState.targets[0], x: 1, y: 0 };
+  const relic = excavate(relicState, 1, 0);
+  assert.deepEqual(relic.event.reward, { coins: 27, starlight: 2 }, "the relic adds to, rather than replaces, the grid reward");
 });
 
 test("a discovered relic produces a visible clue event and completes only after all targets", () => {
