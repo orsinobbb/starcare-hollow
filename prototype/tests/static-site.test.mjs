@@ -36,6 +36,8 @@ test("displayed app version stays aligned with package metadata", async () => {
 
 test("town shell, controller, and versioned save contract ship together", async () => {
   const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
+  const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
+  const town = await readFile(new URL("src/town.js", siteRootUrl), "utf8");
   const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
 
   assert.match(html, /id="town-view"/);
@@ -43,6 +45,16 @@ test("town shell, controller, and versioned save contract ship together", async 
   assert.match(html, /id="town-map"/);
   assert.match(html, /id="town-wish-list"/);
   assert.match(html, /id="town-collection-grid"/);
+  assert.match(html, /id="town-next-quest"/);
+  assert.match(html, /id="town-next-action"/);
+  assert.match(html, /class="town-loop"/);
+  assert.match(html, /現在就做這一件事/);
+  assert.match(html, /data-town-place="garden"/);
+  assert.match(html, /data-town-place="expedition"/);
+  assert.match(html, /先標記下一鏟/);
+  assert.match(css, /\.town-building\.is-next/);
+  assert.match(css, /@keyframes\s+town-next-pulse/);
+  assert.match(town, /export function nextTownQuest/);
   assert.match(app, /createTownController/);
   assert.match(app, /townController\?\.recordShift/);
   assert.match(TOWN_SAVE_KEY, /:v1$/);

@@ -12,6 +12,7 @@ import {
   createTownState,
   fulfillCommission,
   loadTownState,
+  nextTownQuest,
   recordClinicShift,
   recordExpeditionProgress,
   resupplyExpeditionFocus,
@@ -78,6 +79,24 @@ test("moonleaf tea visibly closes the garden-to-expedition focus loop", () => {
   const capped = resupplyExpeditionFocus(almostFull);
   assert.equal(capped.state.expedition.focus, 30);
   assert.equal(capped.delta.expeditionFocus, 2, "the final tea never overfills the focus meter");
+});
+
+test("the town always explains one safe next action instead of showing an undirected dashboard", () => {
+  let state = createTownState();
+  assert.deepEqual(nextTownQuest(state).id, "garden");
+
+  state = tendGarden(state).state;
+  assert.deepEqual(nextTownQuest(state).id, "expedition");
+
+  state = structuredClone(state);
+  state.lifetime.expeditionDigs = 1;
+  assert.deepEqual(nextTownQuest(state).id, "clinic");
+
+  state = recordClinicShift(state, { id: "guided-first-shift", completed: 1, matched: 4, stars: 1 }).state;
+  assert.deepEqual(nextTownQuest(state).id, "rest");
+
+  state = claimDailyReward(state).state;
+  assert.deepEqual(nextTownQuest(state).id, "next-day");
 });
 
 test("a resident commission spends leaves and feeds the shared economy", () => {

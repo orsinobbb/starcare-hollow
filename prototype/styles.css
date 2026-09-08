@@ -4004,3 +4004,839 @@ body.is-board-dragging {
     animation: none;
   }
 }
+
+/* v0.7 — 小鎮首頁不是儀表板；它先讓玩家看見自己身在何處、此刻要做什麼。 */
+body[data-view="town"] {
+  background:
+    radial-gradient(circle at 20% -4%, rgba(251, 193, 108, 0.22), transparent 27rem),
+    radial-gradient(circle at 88% 18%, rgba(117, 153, 255, 0.17), transparent 32rem),
+    linear-gradient(180deg, #1b2949 0%, #16223b 45%, #10192d 100%);
+}
+
+body[data-view="town"] .app-shell {
+  width: min(1600px, calc(100% - 1.4rem));
+  padding-top: 0.7rem;
+}
+
+body[data-view="town"] .game-header {
+  grid-template-columns: minmax(180px, 0.58fr) minmax(0, 1.42fr);
+  gap: 0.7rem;
+  padding: 0.48rem 0.7rem;
+  margin-bottom: 0.55rem;
+  background: rgba(10, 18, 34, 0.73);
+  border-color: rgba(255, 229, 168, 0.15);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(3, 8, 20, 0.25);
+}
+
+body[data-view="town"] .brand-block {
+  gap: 0.5rem;
+}
+
+body[data-view="town"] .brand-mark {
+  width: 37px;
+  height: 37px;
+  font-size: 1rem;
+}
+
+body[data-view="town"] .brand-block .eyebrow {
+  margin-bottom: 0.04rem;
+  font-size: 0.53rem;
+  letter-spacing: 0.1em;
+}
+
+body[data-view="town"] .brand-block h1 {
+  font-size: 1.13rem;
+  letter-spacing: 0.025em;
+}
+
+body[data-view="town"] .hud {
+  display: flex;
+  gap: 0;
+  justify-content: flex-end;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+body[data-view="town"] .hud::-webkit-scrollbar {
+  display: none;
+}
+
+body[data-view="town"] .hud-stat {
+  min-width: max-content;
+  padding: 0.12rem 0.62rem;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 0;
+}
+
+body[data-view="town"] .hud-stat:last-child {
+  border-right: 0;
+}
+
+body[data-view="town"] .hud-label {
+  display: inline;
+  margin: 0 0.22rem 0 0;
+  color: #aebdd3;
+  font-size: 0.61rem;
+}
+
+body[data-view="town"] .hud-stat strong {
+  color: #fff0c8;
+  font-size: 0.83rem;
+}
+
+body[data-view="town"] .world-nav {
+  gap: 0.3rem;
+  justify-content: center;
+  padding: 0.28rem;
+  margin-bottom: 0.7rem;
+  background: rgba(9, 17, 32, 0.38);
+  border-color: rgba(255, 234, 184, 0.1);
+  border-radius: 999px;
+}
+
+body[data-view="town"] .world-tab {
+  min-height: 37px;
+  padding: 0.42rem 0.92rem;
+  font-size: 0.76rem;
+}
+
+body[data-view="town"] .world-tab[aria-current="page"] {
+  box-shadow: 0 4px 14px rgba(223, 166, 76, 0.24);
+}
+
+body[data-view="town"] .save-status {
+  color: #a9dabc;
+  font-size: 0.64rem;
+}
+
+body[data-view="town"] .town-view {
+  gap: 0.85rem;
+}
+
+body[data-view="town"] .town-hero,
+body[data-view="town"] .town-map,
+body[data-view="town"] .wish-journal,
+body[data-view="town"] .collection-journal {
+  border-color: rgba(255, 231, 177, 0.16);
+}
+
+body[data-view="town"] .town-hero {
+  position: relative;
+  display: grid;
+  min-height: 455px;
+  grid-template-columns: minmax(0, 1.18fr) minmax(275px, 0.72fr);
+  gap: 1.35rem;
+  align-items: center;
+  padding: clamp(1.3rem, 3vw, 2.7rem);
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(100deg, rgba(10, 21, 42, 0.97) 3%, rgba(25, 47, 78, 0.9) 52%, rgba(60, 77, 123, 0.44) 100%),
+    radial-gradient(circle at 82% 20%, rgba(255, 202, 116, 0.35), transparent 16rem),
+    linear-gradient(135deg, #1b3558, #405e86 58%, #7c7b9d);
+  border-radius: 30px;
+  box-shadow: inset 0 -6rem 7rem rgba(2, 8, 22, 0.31), 0 18px 45px rgba(1, 7, 19, 0.24);
+}
+
+body[data-view="town"] .town-hero::before,
+body[data-view="town"] .town-hero::after {
+  z-index: -1;
+  opacity: 1;
+}
+
+body[data-view="town"] .town-hero::before {
+  width: 45%;
+  height: 72%;
+  right: -7%;
+  bottom: -30%;
+  background: radial-gradient(ellipse at center, rgba(46, 104, 99, 0.66), rgba(21, 53, 68, 0.05) 68%);
+  filter: blur(3px);
+}
+
+body[data-view="town"] .town-hero::after {
+  inset: auto -3rem -1.6rem 36%;
+  height: 7.3rem;
+  background: radial-gradient(ellipse at center, rgba(255, 213, 129, 0.22), transparent 62%);
+  transform: none;
+}
+
+.town-sky,
+.town-guide {
+  position: absolute;
+  pointer-events: none;
+}
+
+.town-sky {
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.sky-moon {
+  position: absolute;
+  top: 11%;
+  right: 10%;
+  width: 68px;
+  height: 68px;
+  background: #fff1bb;
+  border-radius: 50%;
+  box-shadow: 0 0 0 11px rgba(255, 241, 187, 0.08), 0 0 48px rgba(255, 222, 138, 0.54);
+}
+
+.sky-star {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #fff7d9;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #fff1bd;
+}
+
+.star-one { top: 15%; right: 27%; }
+.star-two { top: 29%; right: 18%; }
+.star-three { top: 9%; right: 42%; }
+
+.distant-hill {
+  position: absolute;
+  bottom: -18%;
+  width: 52%;
+  height: 55%;
+  background: linear-gradient(145deg, rgba(46, 90, 100, 0.86), rgba(12, 39, 53, 0.94));
+  border-radius: 55% 50% 0 0;
+}
+
+.hill-one { right: -14%; transform: rotate(-8deg); }
+.hill-two { right: 20%; height: 34%; opacity: 0.75; transform: rotate(8deg); }
+
+body[data-view="town"] .town-guide {
+  right: clamp(1rem, 5vw, 5.4rem);
+  bottom: 1.55rem;
+  z-index: 0;
+  width: 140px;
+  height: 164px;
+  filter: drop-shadow(0 13px 12px rgba(3, 8, 19, 0.45));
+}
+
+.town-guide-sprite {
+  position: relative;
+  width: 140px;
+  height: 164px;
+  overflow: hidden;
+  border-radius: 44% 44% 35% 35%;
+}
+
+.town-guide-sprite img {
+  position: absolute;
+  width: 610px;
+  max-width: none;
+  height: auto;
+  top: -318px;
+  left: -7px;
+}
+
+.town-guide-lantern {
+  position: absolute;
+  right: -0.85rem;
+  bottom: 2.55rem;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  color: #fff7c7;
+  font-size: 1.05rem;
+  background: #c98d36;
+  border: 2px solid #fff0b0;
+  border-radius: 50%;
+  box-shadow: 0 0 26px rgba(255, 209, 103, 0.78);
+}
+
+body[data-view="town"] .town-hero-copy {
+  position: relative;
+  z-index: 2;
+  max-width: 720px;
+}
+
+body[data-view="town"] .town-hero-copy h2 {
+  max-width: 650px;
+  margin-bottom: 0.55rem;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1.08;
+  text-shadow: 0 3px 20px rgba(0, 0, 0, 0.31);
+}
+
+body[data-view="town"] .town-hero-copy > p:not(.eyebrow) {
+  max-width: 610px;
+  color: #f1eadb;
+  font-size: clamp(0.92rem, 1.4vw, 1.07rem);
+  line-height: 1.65;
+}
+
+body[data-view="town"] .town-story {
+  color: #c4d7e6 !important;
+  font-size: 0.83rem !important;
+}
+
+.town-loop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin: 1.1rem 0 0.8rem;
+  color: #fbe6ae;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.town-loop span {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.34rem 0.52rem;
+  background: rgba(7, 17, 35, 0.36);
+  border: 1px solid rgba(255, 237, 184, 0.16);
+  border-radius: 999px;
+}
+
+.town-loop b {
+  font-size: 0.92rem;
+}
+
+.town-loop i {
+  color: #ffd878;
+  font-style: normal;
+}
+
+body[data-view="town"] .town-hero-actions {
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+body[data-view="town"] .town-hero-actions .secondary-button {
+  color: #e8f0fc;
+  background: rgba(13, 28, 50, 0.43);
+}
+
+.next-quest {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 0.7rem;
+  align-self: center;
+  padding: 1.05rem;
+  background:
+    linear-gradient(145deg, rgba(255, 240, 199, 0.96), rgba(238, 210, 151, 0.92)),
+    #f8dc9c;
+  border: 1px solid #fff5d6;
+  border-radius: 20px 20px 20px 5px;
+  box-shadow: 0 16px 32px rgba(3, 8, 20, 0.26), inset 0 0 0 2px rgba(141, 89, 36, 0.13);
+}
+
+.next-quest::after {
+  position: absolute;
+  right: 1rem;
+  bottom: -12px;
+  width: 23px;
+  height: 23px;
+  content: "";
+  background: #efd49a;
+  border-right: 1px solid rgba(141, 89, 36, 0.22);
+  border-bottom: 1px solid rgba(141, 89, 36, 0.22);
+  transform: rotate(45deg);
+}
+
+.next-quest-topline {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  color: #855328;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.quest-signal {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: #fff6cc;
+  background: #bf7a29;
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(203, 139, 44, 0.52);
+}
+
+.next-quest-topline small {
+  margin-left: auto;
+  color: #8f673a;
+  font-size: 0.64rem;
+}
+
+.next-quest h3 {
+  margin: 0;
+  color: #372818;
+  font-family: Georgia, "Noto Serif TC", serif;
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.next-quest > p {
+  margin: -0.25rem 0 0;
+  color: #5b452d;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.next-quest .next-quest-reward {
+  padding: 0.5rem 0.55rem;
+  color: #725123;
+  font-size: 0.71rem;
+  font-weight: 800;
+  background: rgba(173, 112, 38, 0.1);
+  border-radius: 9px;
+}
+
+.next-quest .primary-button {
+  min-height: 47px;
+  color: #2e2113;
+  background: linear-gradient(145deg, #ffe69c, #d99735);
+}
+
+.district-progress-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 0.5rem;
+  align-items: center;
+  padding-top: 0.65rem;
+  margin-top: 0.1rem;
+  border-top: 1px dashed rgba(112, 73, 30, 0.28);
+}
+
+.district-emblem {
+  grid-row: span 2;
+  font-size: 1.4rem;
+}
+
+.district-progress-card div:not(.district-meter) {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.district-progress-card span:not(.district-emblem),
+.district-progress-card small {
+  color: #7a5d35;
+  font-size: 0.61rem;
+}
+
+.district-progress-card strong {
+  color: #4b351d;
+  font-size: 0.78rem;
+}
+
+.district-meter {
+  grid-column: 2;
+  height: 7px;
+  overflow: hidden;
+  background: rgba(91, 59, 24, 0.16);
+  border-radius: 999px;
+}
+
+.district-meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #d68a34, #fff09a);
+  border-radius: inherit;
+  box-shadow: 0 0 10px rgba(255, 207, 84, 0.56);
+}
+
+body[data-view="town"] .town-dashboard {
+  display: block;
+}
+
+body[data-view="town"] .town-map {
+  padding: clamp(1rem, 2.4vw, 1.75rem);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 5% 6%, rgba(255, 222, 153, 0.22), transparent 14rem),
+    radial-gradient(circle at 95% 100%, rgba(70, 167, 151, 0.2), transparent 18rem),
+    linear-gradient(145deg, rgba(38, 69, 79, 0.98), rgba(22, 46, 65, 0.98));
+  border-radius: 28px;
+}
+
+body[data-view="town"] .town-map::before {
+  inset: auto -4% -10% 18%;
+  width: 85%;
+  height: 55%;
+  opacity: 0.3;
+  background: repeating-linear-gradient(125deg, transparent 0 52px, rgba(255, 225, 139, 0.75) 53px 57px, transparent 58px 105px);
+  transform: rotate(-5deg);
+}
+
+body[data-view="town"] .section-heading {
+  position: relative;
+  z-index: 2;
+  align-items: end;
+}
+
+body[data-view="town"] .section-heading h2 {
+  font-size: clamp(1.45rem, 2.5vw, 2.1rem);
+}
+
+body[data-view="town"] .town-lifetime {
+  padding: 0.45rem 0.65rem;
+  color: #f7e7b5;
+  font-size: 0.71rem;
+  background: rgba(5, 18, 32, 0.3);
+  border: 1px solid rgba(255, 237, 182, 0.14);
+  border-radius: 999px;
+}
+
+.town-map-intro {
+  position: relative;
+  z-index: 2;
+  max-width: 650px;
+  margin: 0.45rem 0 1.1rem;
+  color: #d9e7e2;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+body[data-view="town"] .town-building-grid {
+  position: relative;
+  z-index: 2;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+body[data-view="town"] .town-building {
+  position: relative;
+  min-height: 266px;
+  padding: 0.9rem;
+  overflow: visible;
+  background: linear-gradient(155deg, rgba(32, 54, 72, 0.91), rgba(19, 35, 53, 0.94));
+  border-color: rgba(255, 235, 186, 0.13);
+  border-radius: 21px;
+  box-shadow: 0 10px 18px rgba(1, 9, 19, 0.17);
+}
+
+body[data-view="town"] .town-building::after {
+  top: -0.32rem;
+  right: 1rem;
+  width: 48px;
+  height: 7px;
+  opacity: 0.85;
+  background: var(--building-accent);
+  border-radius: 0 0 99px 99px;
+}
+
+body[data-view="town"] .town-building::before {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.5rem;
+  z-index: -1;
+  color: color-mix(in srgb, var(--building-accent) 47%, white);
+  font-family: Georgia, serif;
+  font-size: 5.5rem;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0.11;
+  content: "✦";
+}
+
+body[data-view="town"] .garden-building { background: linear-gradient(155deg, rgba(42, 94, 74, 0.96), rgba(22, 55, 62, 0.94)); }
+body[data-view="town"] .expedition-building { background: linear-gradient(155deg, rgba(53, 69, 116, 0.96), rgba(26, 44, 75, 0.96)); }
+body[data-view="town"] .clinic-building { background: linear-gradient(155deg, rgba(89, 59, 111, 0.96), rgba(43, 44, 84, 0.96)); }
+body[data-view="town"] .workshop-building { background: linear-gradient(155deg, rgba(104, 69, 51, 0.96), rgba(51, 45, 60, 0.96)); }
+body[data-view="town"] .plaza-building { background: linear-gradient(155deg, rgba(91, 77, 51, 0.96), rgba(43, 56, 73, 0.96)); }
+
+body[data-view="town"] .building-icon {
+  width: 56px;
+  height: 56px;
+  border: 2px solid color-mix(in srgb, var(--building-accent) 60%, white);
+  border-radius: 18px 18px 18px 5px;
+}
+
+body[data-view="town"] .building-icon span {
+  font-size: 1.65rem;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.16));
+}
+
+body[data-view="town"] .building-heading strong {
+  font-size: 1.1rem;
+}
+
+body[data-view="town"] .building-kicker {
+  color: color-mix(in srgb, var(--building-accent) 60%, #f8f0d2);
+}
+
+body[data-view="town"] .town-building > p {
+  color: #d7e1e3;
+  font-size: 0.72rem;
+}
+
+body[data-view="town"] .town-building .building-benefit {
+  min-height: 2.35rem;
+  color: #f3fbec;
+  font-size: 0.7rem;
+  background: rgba(9, 21, 35, 0.25);
+}
+
+body[data-view="town"] .building-actions {
+  gap: 0.38rem;
+}
+
+body[data-view="town"] .building-actions .compact {
+  min-height: 38px;
+  padding: 0.42rem;
+  font-size: 0.69rem;
+}
+
+body[data-view="town"] .town-building.is-next {
+  z-index: 3;
+  border-color: #ffe18e;
+  box-shadow: 0 0 0 3px rgba(255, 219, 112, 0.18), 0 0 26px rgba(255, 203, 84, 0.35), 0 14px 25px rgba(1, 9, 19, 0.28);
+  animation: town-next-pulse 1.8s ease-in-out infinite;
+}
+
+body[data-view="town"] .town-building.is-next::before {
+  top: -0.75rem;
+  right: 0.7rem;
+  bottom: auto;
+  z-index: 4;
+  padding: 0.24rem 0.5rem;
+  color: #3b2914;
+  font-family: inherit;
+  font-size: 0.59rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  background: #ffe293;
+  border-radius: 999px;
+  opacity: 1;
+  content: "現在去這裡";
+}
+
+@keyframes town-next-pulse {
+  50% { transform: translateY(-3px); box-shadow: 0 0 0 5px rgba(255, 219, 112, 0.08), 0 0 32px rgba(255, 203, 84, 0.43), 0 16px 27px rgba(1, 9, 19, 0.3); }
+}
+
+body[data-view="town"] .wish-journal {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.7fr) minmax(0, 1.55fr) minmax(180px, 0.6fr);
+  gap: 0.8rem 1rem;
+  align-items: center;
+  padding: 1rem 1.1rem;
+  margin-top: 0.85rem;
+  background: linear-gradient(115deg, rgba(35, 49, 79, 0.97), rgba(36, 73, 84, 0.94));
+  border-radius: 21px;
+}
+
+body[data-view="town"] .wish-heading {
+  display: block;
+}
+
+body[data-view="town"] .wish-heading > strong {
+  display: inline-block;
+  margin-top: 0.3rem;
+  color: #ffe18b;
+  font-size: 1rem;
+}
+
+body[data-view="town"] .wish-journal > p {
+  grid-column: 1;
+  margin: 0;
+  color: #cbdce5;
+  font-size: 0.7rem;
+}
+
+body[data-view="town"] .town-wish-list {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+body[data-view="town"] .wish-item {
+  grid-template-columns: 28px 1fr;
+  gap: 0.35rem;
+  min-height: 70px;
+  padding: 0.48rem;
+  background: rgba(7, 17, 34, 0.3);
+}
+
+body[data-view="town"] .wish-item strong {
+  font-size: 0.68rem;
+}
+
+body[data-view="town"] .wish-item small {
+  font-size: 0.58rem;
+  line-height: 1.35;
+}
+
+body[data-view="town"] .wish-reward {
+  grid-column: 3;
+  margin: 0;
+  padding: 0.65rem;
+}
+
+body[data-view="town"] .wish-reward span,
+body[data-view="town"] .wish-reward strong {
+  font-size: 0.61rem;
+  line-height: 1.45;
+}
+
+body[data-view="town"] .wish-journal > button {
+  grid-column: 3;
+  width: 100%;
+  margin: 0;
+  font-size: 0.74rem;
+}
+
+body[data-view="town"] .collection-journal {
+  padding: 1rem 1.15rem;
+  border-radius: 24px;
+}
+
+@media (max-width: 1030px) {
+  body[data-view="town"] .town-building-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body[data-view="town"] .wish-journal {
+    grid-template-columns: minmax(185px, 0.7fr) minmax(0, 1.3fr);
+  }
+
+  body[data-view="town"] .wish-reward,
+  body[data-view="town"] .wish-journal > button {
+    grid-column: 1;
+  }
+
+  body[data-view="town"] .wish-reward {
+    grid-row: 3;
+  }
+
+  body[data-view="town"] .wish-journal > button {
+    grid-row: 4;
+  }
+}
+
+@media (max-width: 760px) {
+  body[data-view="town"] .app-shell {
+    width: min(100% - 0.75rem, 760px);
+    padding-top: 0.35rem;
+  }
+
+  body[data-view="town"] .game-header {
+    grid-template-columns: 1fr;
+    gap: 0.3rem;
+    top: 0.25rem;
+    padding: 0.45rem 0.55rem;
+  }
+
+  body[data-view="town"] .hud {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  body[data-view="town"] .hud-stat {
+    padding: 0.06rem 0.47rem;
+  }
+
+  body[data-view="town"] .world-nav {
+    overflow-x: auto;
+    justify-content: flex-start;
+    border-radius: 15px;
+  }
+
+  body[data-view="town"] .world-tab {
+    flex: 0 0 auto;
+  }
+
+  body[data-view="town"] .save-status {
+    display: none;
+  }
+
+  body[data-view="town"] .town-hero {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    gap: 1.4rem;
+    padding: 1.15rem;
+    border-radius: 23px;
+  }
+
+  body[data-view="town"] .town-hero-copy {
+    padding-right: 3rem;
+  }
+
+  body[data-view="town"] .town-hero-copy h2 {
+    font-size: clamp(1.75rem, 9vw, 2.5rem);
+  }
+
+  body[data-view="town"] .town-guide {
+    right: 0.6rem;
+    bottom: auto;
+    top: 1.1rem;
+    width: 93px;
+    height: 108px;
+    opacity: 0.78;
+  }
+
+  .town-guide-sprite {
+    width: 93px;
+    height: 108px;
+  }
+
+  .town-guide-sprite img {
+    width: 405px;
+    top: -211px;
+    left: -4px;
+  }
+
+  .town-guide-lantern {
+    right: -0.35rem;
+    bottom: 1.25rem;
+    width: 25px;
+    height: 25px;
+    font-size: 0.77rem;
+  }
+
+  .next-quest {
+    width: min(100%, 460px);
+  }
+
+  body[data-view="town"] .town-building-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-view="town"] .town-building {
+    min-height: 0;
+  }
+
+  body[data-view="town"] .wish-journal {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-view="town"] .wish-journal > p,
+  body[data-view="town"] .town-wish-list,
+  body[data-view="town"] .wish-reward,
+  body[data-view="town"] .wish-journal > button {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  body[data-view="town"] .town-wish-list {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-view="town"] .wish-item {
+    min-height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-view="town"] .town-building.is-next {
+    animation: none;
+  }
+}

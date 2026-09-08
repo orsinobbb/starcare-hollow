@@ -54,6 +54,12 @@ export const DAILY_WISHES = [
   { id: "clinic", title: "完成遊戲委託", detail: "完成一場小遊戲挑戰" }
 ];
 
+const WISH_SYMBOLS = Object.freeze({
+  garden: "🌿",
+  commission: "🔨",
+  clinic: "🃏"
+});
+
 export const COLLECTION_ITEMS = Object.freeze([
   {
     id: "founders-mark",
@@ -553,6 +559,74 @@ export function townStage(restoration) {
   return { title: "第一盞燈正亮起", detail: "完成遊戲與居民委託，讓暖燈坡逐步甦醒。", rank: "初亮" };
 }
 
+export function nextTownQuest(state) {
+  const wishes = completedWishCount(state);
+  if (state.daily.rewardClaimed) {
+    return {
+      id: "next-day",
+      target: "plaza",
+      step: "新的一天",
+      title: "讓暖燈坡迎接新的晨光",
+      detail: "今天的成果已妥善保存。進到明天後，藥園、遊戲委託與選做材料單都會重新準備好。",
+      reward: "你保留所有資源、收藏與小鎮修復進度",
+      action: "進入下一日"
+    };
+  }
+  if (wishes >= MINIMUM_DAILY_WISHES_FOR_REST) {
+    return {
+      id: "rest",
+      target: "plaza",
+      step: "今日收尾",
+      title: "先收下歇息禮，再決定要不要多玩一項",
+      detail: "你已完成任兩項今日星願，可以安全進入下一日。第三項只是額外的完整修復獎勵，不是門票。",
+      reward: "兩項：星幣 +25、暖木 +1；三項會升級成完整修復禮",
+      action: "領取歇息禮"
+    };
+  }
+  if (!state.daily.garden) {
+    return {
+      id: "garden",
+      target: "garden",
+      step: "第 1 步",
+      title: "先到月芽藥園採收",
+      detail: "月芽葉是這趟旅程的燃料：可以泡成暖茶，替遠征羅盤補回專注。",
+      reward: `獲得 ${state.buildings.garden + 2} 片月芽葉，並點亮 1 點修復度`,
+      action: "採收月芽葉"
+    };
+  }
+  if (state.lifetime.expeditionDigs === 0) {
+    return {
+      id: "expedition",
+      target: "expedition",
+      step: "第 2 步",
+      title: "帶挖礦者去找第一份星砂",
+      detail: "在地圖上挑一個相鄰迷霧格。挖礦者會走過去、挖掘，並把每一格的材料清楚交給你。",
+      reward: "每格都有材料；遺物還會成為永久收藏與額外大獎",
+      action: "前往星脈遠征"
+    };
+  }
+  if (!state.daily.clinic) {
+    return {
+      id: "clinic",
+      target: "clinic",
+      step: "第 3 步",
+      title: "換個節奏，完成一局可愛配對",
+      detail: "翻牌、配對與收納會輪流出現。完成一局就算今日遊戲委託，也能帶回小鎮資源。",
+      reward: "獲得星幣、星砂與修復度；達成任兩項星願就可過夜",
+      action: "進入小遊戲屋"
+    };
+  }
+  return {
+    id: "expedition",
+    target: "expedition",
+    step: "自由探索",
+    title: "下一盞燈的線索藏在星砂群島",
+    detail: "今天的必要事項都完成了。你可以繼續挖寶、收集遺物，或直接回到廣場收下歇息禮。",
+    reward: "繼續收集材料，為下一次升級與修復做準備",
+    action: "繼續挖寶"
+  };
+}
+
 export function createTownController({ root = document, storage = globalThis.localStorage, onEnterClinic, onEnterExpedition, onNotify } = {}) {
   let state = loadTownState(storage);
   let recentCollectionIds = [];
@@ -572,6 +646,12 @@ export function createTownController({ root = document, storage = globalThis.loc
     restorationBar: element("#town-restoration-bar"),
     stageTitle: element("#town-stage-title"),
     stageDetail: element("#town-stage-detail"),
+    nextQuest: element("#town-next-quest"),
+    nextQuestStep: element("#town-next-step"),
+    nextQuestTitle: element("#town-next-title"),
+    nextQuestDetail: element("#town-next-detail"),
+    nextQuestReward: element("#town-next-reward"),
+    nextQuestAction: element("#town-next-action"),
     wishList: element("#town-wish-list"),
     wishCount: element("#town-wish-count"),
     claimReward: element("#claim-town-reward"),
@@ -633,7 +713,7 @@ export function createTownController({ root = document, storage = globalThis.loc
       const completed = state.daily[wish.id];
       const item = document.createElement("li");
       item.className = completed ? "wish-item is-complete" : "wish-item";
-      item.innerHTML = `<span class="wish-check" aria-hidden="true">${completed ? "✓" : "✦"}</span><span><strong>${wish.title}</strong><small>${wish.detail}</small></span>`;
+      item.innerHTML = `<span class="wish-check" aria-hidden="true">${completed ? "✓" : WISH_SYMBOLS[wish.id]}</span><span><strong>${wish.title}</strong><small>${wish.detail}</small></span>`;
       ui.wishList?.append(item);
     }
 
@@ -699,6 +779,16 @@ export function createTownController({ root = document, storage = globalThis.loc
     }
     if (ui.stageTitle) ui.stageTitle.textContent = stage.title;
     if (ui.stageDetail) ui.stageDetail.textContent = stage.detail;
+    const quest = nextTownQuest(state);
+    if (ui.nextQuest) ui.nextQuest.dataset.quest = quest.id;
+    if (ui.nextQuestStep) ui.nextQuestStep.textContent = quest.step;
+    if (ui.nextQuestTitle) ui.nextQuestTitle.textContent = quest.title;
+    if (ui.nextQuestDetail) ui.nextQuestDetail.textContent = quest.detail;
+    if (ui.nextQuestReward) ui.nextQuestReward.textContent = `完成後：${quest.reward}`;
+    if (ui.nextQuestAction) ui.nextQuestAction.textContent = quest.action;
+    for (const place of root.querySelectorAll("[data-town-place]")) {
+      place.classList.toggle("is-next", place.dataset.townPlace === quest.target);
+    }
     if (ui.gardenAction) {
       ui.gardenAction.disabled = state.daily.garden;
       ui.gardenAction.textContent = state.daily.garden ? "今日已採收" : `採收 ${state.buildings.garden + 2} 片月芽葉`;
@@ -719,6 +809,14 @@ export function createTownController({ root = document, storage = globalThis.loc
   element("#clinic-building-action")?.addEventListener("click", enterClinic);
   element("#enter-expedition")?.addEventListener("click", enterExpedition);
   element("#expedition-building-action")?.addEventListener("click", enterExpedition);
+  ui.nextQuestAction?.addEventListener("click", () => {
+    const quest = nextTownQuest(state);
+    if (quest.id === "garden") commit(tendGarden(state));
+    else if (quest.id === "clinic") enterClinic();
+    else if (quest.id === "expedition") enterExpedition();
+    else if (quest.id === "rest") commit(claimDailyReward(state));
+    else if (quest.id === "next-day") commit(advanceTownDay(state));
+  });
   ui.gardenAction?.addEventListener("click", () => commit(tendGarden(state)));
   ui.commissionAction?.addEventListener("click", () => commit(fulfillCommission(state)));
   ui.claimReward?.addEventListener("click", () => commit(claimDailyReward(state)));

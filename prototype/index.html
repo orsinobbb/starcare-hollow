@@ -9,7 +9,7 @@
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.6.3" />
+    <link rel="stylesheet" href="./styles.css?v=0.7.0" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,26 +19,34 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.6.3</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.7.0</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
 
         <div id="town-hud" class="hud" aria-label="小鎮資源">
           <div class="hud-stat hud-day">
-            <span class="hud-label">小鎮日程</span>
+            <span class="hud-label"><i aria-hidden="true">☀</i> 小鎮日程</span>
             <strong id="town-day">第 1 日</strong>
           </div>
           <div class="hud-stat">
-            <span class="hud-label">星幣</span>
+            <span class="hud-label"><i aria-hidden="true">✦</i> 星幣</span>
             <strong id="town-coins">90</strong>
           </div>
           <div class="hud-stat">
-            <span class="hud-label">月芽／暖木／星砂</span>
-            <strong><span id="town-moonleaf">1</span>／<span id="town-timber">2</span>／<span id="town-starlight">0</span></strong>
+            <span class="hud-label"><i aria-hidden="true">🌿</i> 月芽葉</span>
+            <strong id="town-moonleaf">1</strong>
+          </div>
+          <div class="hud-stat">
+            <span class="hud-label"><i aria-hidden="true">🪵</i> 暖木</span>
+            <strong id="town-timber">2</strong>
+          </div>
+          <div class="hud-stat">
+            <span class="hud-label"><i aria-hidden="true">✧</i> 星砂</span>
+            <strong id="town-starlight">0</strong>
           </div>
           <div class="hud-stat hud-restoration">
-            <span class="hud-label">暖燈坡修復</span>
+            <span class="hud-label"><i aria-hidden="true">🏮</i> 暖燈坡</span>
             <strong id="town-restoration">0 / 30</strong>
           </div>
         </div>
@@ -88,124 +96,152 @@
       </header>
 
       <nav class="world-nav" aria-label="主要區域">
-        <button id="town-tab" class="world-tab" type="button" aria-current="page">⌂ 小鎮</button>
-        <button id="clinic-tab" class="world-tab" type="button">✚ 小遊戲屋</button>
-        <button id="expedition-tab" class="world-tab" type="button">✦ 星脈遠征</button>
+        <button id="town-tab" class="world-tab" type="button" aria-current="page"><span aria-hidden="true">⌂</span> 小鎮</button>
+        <button id="clinic-tab" class="world-tab" type="button"><span aria-hidden="true">🃏</span> 配對遊戲</button>
+        <button id="expedition-tab" class="world-tab" type="button"><span aria-hidden="true">🧭</span> 挖寶遠征</button>
         <span id="save-status" class="save-status" role="status">✓ 新存檔已建立</span>
       </nav>
 
       <main id="main-content">
         <section id="town-view" class="town-view" aria-labelledby="town-title">
           <section class="town-hero">
+            <div class="town-sky" aria-hidden="true">
+              <span class="sky-moon"></span>
+              <span class="sky-star star-one"></span><span class="sky-star star-two"></span><span class="sky-star star-three"></span>
+              <span class="distant-hill hill-one"></span><span class="distant-hill hill-two"></span>
+            </div>
+            <div class="town-guide" aria-hidden="true">
+              <div class="town-guide-sprite"><img src="./assets/card-companions-v1.jpg" alt="" /></div>
+              <span class="town-guide-lantern">✦</span>
+            </div>
             <div class="town-hero-copy">
-              <p class="eyebrow">暖燈坡 · <span id="town-rank">初亮</span></p>
+              <p class="eyebrow">你是暖燈坡的照料人 · <span id="town-rank">初亮</span></p>
               <h2 id="town-title"><span id="town-stage-title">第一盞燈正亮起</span></h2>
               <p id="town-stage-detail">完成小遊戲與居民委託，讓暖燈坡逐步甦醒。</p>
+              <p class="town-story">星霧讓街燈沉睡了。採收月芽葉、指揮挖礦者找回星砂，暖燈坡就會一盞一盞亮起。</p>
+              <div class="town-loop" aria-label="主要遊戲循環">
+                <span><b aria-hidden="true">🌿</b>採收月芽葉</span>
+                <i aria-hidden="true">→</i>
+                <span><b aria-hidden="true">🧭</b>帶挖礦者挖寶</span>
+                <i aria-hidden="true">→</i>
+                <span><b aria-hidden="true">🏮</b>點亮小鎮</span>
+              </div>
               <div class="town-hero-actions">
-                <button id="enter-clinic" class="primary-button" type="button">前往小遊戲屋</button>
-                <button id="enter-expedition" class="secondary-button" type="button">前往星砂群島</button>
-                <span>短玩一次也會永久累積</span>
+                <button id="enter-clinic" class="secondary-button compact" type="button">玩一局配對遊戲</button>
+                <button id="enter-expedition" class="secondary-button compact" type="button">自由前往遠征</button>
               </div>
             </div>
-            <div class="district-progress-card">
-              <span class="district-emblem" aria-hidden="true">✦</span>
-              <div>
-                <span>長期目標</span>
-                <strong>修復暖燈坡</strong>
-                <small>達到 30 點，點亮通往下一區的星橋</small>
+            <aside id="town-next-quest" class="next-quest" data-quest="garden" aria-live="polite">
+              <div class="next-quest-topline">
+                <span class="quest-signal" aria-hidden="true">✦</span>
+                <span>現在就做這一件事</span>
+                <small id="town-next-step">第 1 步</small>
               </div>
-              <div class="district-meter" role="progressbar" aria-label="暖燈坡修復進度" aria-valuemin="0" aria-valuemax="30" aria-valuenow="0">
-                <span id="town-restoration-bar"></span>
+              <h3 id="town-next-title">先到月芽藥園採收</h3>
+              <p id="town-next-detail">採下月芽葉。它能補充遠征專注，也是今天最安全的第一步。</p>
+              <p id="town-next-reward" class="next-quest-reward">獲得：月芽葉 → 可泡暖茶補專注</p>
+              <button id="town-next-action" class="primary-button" type="button">前往月芽藥園</button>
+              <div class="district-progress-card">
+                <span class="district-emblem" aria-hidden="true">🏮</span>
+                <div>
+                  <span>長期目標</span>
+                  <strong>修復暖燈坡</strong>
+                  <small>累積 30 點，點亮通往下一區的星橋</small>
+                </div>
+                <div class="district-meter" role="progressbar" aria-label="暖燈坡修復進度" aria-valuemin="0" aria-valuemax="30" aria-valuenow="0">
+                  <span id="town-restoration-bar"></span>
+                </div>
               </div>
-            </div>
+            </aside>
           </section>
 
           <div class="town-dashboard">
             <section id="town-map" class="town-map" aria-labelledby="building-title">
               <div class="section-heading">
                 <div>
-                  <p class="eyebrow">每座建築都改變玩法</p>
-                  <h2 id="building-title">小鎮設施</h2>
+                  <p class="eyebrow">跟著燈火走</p>
+                  <h2 id="building-title">走進暖燈坡</h2>
                 </div>
-                <p id="town-lifetime" class="town-lifetime">已完成 0 場 · 配成 0 組 · 升級 0 次</p>
+                <p id="town-lifetime" class="town-lifetime">點一個地標，就能開始玩</p>
               </div>
+              <p class="town-map-intro">每個地標都直接告訴你「做什麼」與「會得到什麼」；金色光圈是目前建議的下一站。</p>
 
               <div id="town-building-grid" class="town-building-grid">
-                <article class="town-building clinic-building">
-                  <div class="building-icon" aria-hidden="true">✚</div>
+                <article class="town-building garden-building" data-town-place="garden">
+                  <div class="building-icon" aria-hidden="true"><span>🌿</span></div>
                   <div class="building-heading">
-                    <span class="building-kicker">核心玩法</span>
-                    <strong>暖星小遊戲屋</strong>
-                    <span class="level-chip" data-building-level="clinic">Lv.1</span>
-                  </div>
-                  <p>完成翻牌、配對與收納委託，把星幣、星砂與修復度帶回小鎮。</p>
-                  <p class="building-benefit" data-building-benefit="clinic">每場小遊戲額外獲得 0 星幣</p>
-                  <div class="building-actions">
-                    <button id="clinic-building-action" class="primary-button compact" type="button">挑戰小遊戲</button>
-                    <button class="secondary-button compact" data-upgrade-building="clinic" type="button">升級 Lv.2</button>
-                  </div>
-                  <small class="building-cost" data-building-cost="clinic">下次升級：星幣 120 · 月芽葉 4</small>
-                </article>
-
-                <article class="town-building garden-building">
-                  <div class="building-icon" aria-hidden="true">❧</div>
-                  <div class="building-heading">
-                    <span class="building-kicker">每日採集</span>
+                    <span class="building-kicker">每天一次 · 補給站</span>
                     <strong>月芽藥園</strong>
                     <span class="level-chip" data-building-level="garden">Lv.1</span>
                   </div>
-                  <p>每日照料一次，不枯萎、不追現實時間；藥草能直接供應居民。</p>
+                  <p class="building-purpose">點一下採收月芽葉。葉子可以泡暖茶，讓挖礦者走得更遠。</p>
                   <p class="building-benefit" data-building-benefit="garden">每日採收 3 片月芽葉・遠征暖茶補給</p>
                   <div class="building-actions">
-                    <button id="garden-action" class="primary-button compact" type="button">採收 3 片月芽葉</button>
-                    <button class="secondary-button compact" data-upgrade-building="garden" type="button">升級 Lv.2</button>
+                    <button id="garden-action" class="primary-button compact" type="button">採收月芽葉</button>
+                    <button class="secondary-button compact" data-upgrade-building="garden" type="button">升級藥園</button>
                   </div>
                   <small class="building-cost" data-building-cost="garden">下次升級：星幣 90 · 暖木 2</small>
                 </article>
 
-                <article class="town-building workshop-building">
-                  <div class="building-icon" aria-hidden="true">⚒</div>
+                <article class="town-building expedition-building" data-town-place="expedition">
+                  <div class="building-icon" aria-hidden="true"><span>🧭</span></div>
                   <div class="building-heading">
-                    <span class="building-kicker">居民委託</span>
+                    <span class="building-kicker">主要冒險 · 每格有收穫</span>
+                    <strong>星脈遠征</strong>
+                    <span class="level-chip">挖寶</span>
+                  </div>
+                  <p class="building-purpose">選一格 → 挖礦者走過去 → 挖出材料或遺物。可先標記下一鏟。</p>
+                  <p class="building-benefit">每格都有材料；遺物是額外收藏與大獎。</p>
+                  <div class="building-actions">
+                    <button id="expedition-building-action" class="primary-button compact" type="button">帶挖礦者出發</button>
+                  </div>
+                  <small class="building-cost">專注來自月芽暖茶；不足時先回藥園採收。</small>
+                </article>
+
+                <article class="town-building clinic-building" data-town-place="clinic">
+                  <div class="building-icon" aria-hidden="true"><span>🃏</span></div>
+                  <div class="building-heading">
+                    <span class="building-kicker">換個節奏 · 配對小遊戲</span>
+                    <strong>暖星小遊戲屋</strong>
+                    <span class="level-chip" data-building-level="clinic">Lv.1</span>
+                  </div>
+                  <p class="building-purpose">玩翻牌、配對或收納。完成一局會帶回星幣、星砂與今日星願。</p>
+                  <p class="building-benefit" data-building-benefit="clinic">每場小遊戲額外獲得 0 星幣</p>
+                  <div class="building-actions">
+                    <button id="clinic-building-action" class="primary-button compact" type="button">進入並玩一局</button>
+                    <button class="secondary-button compact" data-upgrade-building="clinic" type="button">升級小遊戲屋</button>
+                  </div>
+                  <small class="building-cost" data-building-cost="clinic">下次升級：星幣 120 · 月芽葉 4</small>
+                </article>
+
+                <article class="town-building workshop-building" data-town-place="workshop">
+                  <div class="building-icon" aria-hidden="true"><span>🔨</span></div>
+                  <div class="building-heading">
+                    <span class="building-kicker">選做 · 換建設材料</span>
                     <strong>回響工坊</strong>
                     <span class="level-chip" data-building-level="workshop">Lv.1</span>
                   </div>
-                  <p>把藥園產物交給托比，換回建設所需的星幣與暖木；可留到明日，不會卡住日程。</p>
+                  <p class="building-purpose">交 3 片月芽葉，換星幣與暖木。缺葉子就跳過，明天再做也沒關係。</p>
                   <p class="building-benefit" data-building-benefit="workshop">委託可獲得 35 星幣</p>
                   <div class="building-actions">
-                    <button id="commission-action" class="primary-button compact" type="button">交付 3 片月芽葉（選做）</button>
-                    <button class="secondary-button compact" data-upgrade-building="workshop" type="button">升級 Lv.2</button>
+                    <button id="commission-action" class="secondary-button compact" type="button">交材料（選做）</button>
+                    <button class="secondary-button compact" data-upgrade-building="workshop" type="button">升級工坊</button>
                   </div>
                   <small class="building-cost" data-building-cost="workshop">下次升級：星幣 110 · 暖木 3</small>
                 </article>
 
-                <article class="town-building plaza-building">
-                  <div class="building-icon" aria-hidden="true">☆</div>
+                <article class="town-building plaza-building" data-town-place="plaza">
+                  <div class="building-icon" aria-hidden="true"><span>🏮</span></div>
                   <div class="building-heading">
-                    <span class="building-kicker">世界變化</span>
+                    <span class="building-kicker">終點會一直留下來</span>
                     <strong>星願廣場</strong>
-                    <span class="level-chip">地標</span>
+                    <span class="level-chip">修復地標</span>
                   </div>
-                  <p>每日星願與所有模式的成果都匯聚在這裡，逐步改變街景與居民活動。</p>
+                  <p class="building-purpose">你帶回的成果會變成街燈、花圃與星橋。這就是小鎮長大的證明。</p>
                   <p class="building-benefit">下一個里程碑：修復度 10</p>
                   <div class="plaza-preview" aria-label="尚待解鎖的鎮景">
                     <span>街燈</span><span>花圃</span><span>星橋</span>
                   </div>
-                </article>
-
-                <article class="town-building expedition-building">
-                  <div class="building-icon" aria-hidden="true">✦</div>
-                  <div class="building-heading">
-                    <span class="building-kicker">逐格探索</span>
-                    <strong>星脈遠征</strong>
-                    <span class="level-chip">星砂群島</span>
-                  </div>
-                  <p>拖曳地圖、點選相鄰格調查；羅盤會留下可推理的遠近線索。</p>
-                  <p class="building-benefit">主要寶物不會消失，找到後會寫入星願手札。</p>
-                  <div class="building-actions">
-                    <button id="expedition-building-action" class="primary-button compact" type="button">開始挖寶</button>
-                  </div>
-                  <small class="building-cost">技術切片：Canvas 高 DPI、慣性鏡頭與本機存檔已啟用</small>
                 </article>
               </div>
             </section>
@@ -213,12 +249,12 @@
             <aside class="wish-journal" aria-labelledby="wish-title">
               <div class="wish-heading">
                 <div>
-                  <p class="eyebrow">短期目標</p>
+                  <p class="eyebrow">今天能做的事</p>
                   <h2 id="wish-title">今日星願</h2>
                 </div>
                 <strong id="town-wish-count">0 / 3</strong>
               </div>
-              <p>完成任兩項星願即可安心進入下一日；三項全完成才有完整修復禮，居民委託可選擇保留到明日。</p>
+              <p id="town-wish-guidance">做完任兩項就能安心睡覺進到明天；第三項是可選的完整修復獎勵。你永遠不會因為少葉子卡關。</p>
               <ol id="town-wish-list" class="town-wish-list"></ol>
               <div class="wish-reward">
                 <span>兩章可歇息・三章完整修復</span>
@@ -496,6 +532,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.6.3"></script>
+    <script type="module" src="./src/app.js?v=0.7.0"></script>
   </body>
 </html>
