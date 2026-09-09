@@ -1,6 +1,4 @@
-import { createRng } from "./engine.js";
-
-export const EXPEDITION_SCHEMA_VERSION = 1;
+export const EXPEDITION_SCHEMA_VERSION = 2;
 export const EXPEDITION_ID = "starsand-prototype";
 export const EXPEDITION_WIDTH = 8;
 export const EXPEDITION_HEIGHT = 8;
@@ -13,10 +11,16 @@ export const TERRAIN = Object.freeze({
 });
 
 const TARGETS = Object.freeze([
-  { id: "tide-shell", name: "潮音貝譜", icon: "♬", reward: { coins: 18, starlight: 1 } },
-  { id: "cloud-tool", name: "雲航刻尺", icon: "⌁", reward: { coins: 18, starlight: 1 } },
-  { id: "echo-vial", name: "古療瓶", icon: "⚗", reward: { coins: 24, starlight: 2 } }
+  { id: "tide-shell", name: "潮音貝譜", icon: "♬", reward: { coins: 18, starlight: 1 }, x: 3, y: 1 },
+  { id: "cloud-tool", name: "雲航刻尺", icon: "⌁", reward: { coins: 18, starlight: 1 }, x: 5, y: 4 },
+  { id: "echo-vial", name: "古療瓶", icon: "⚗", reward: { coins: 24, starlight: 2 }, x: 7, y: 6 }
 ]);
+
+export const EXPEDITION_REGIONS = Object.freeze({
+  shore: { id: "shore", name: "晨潮沙灣", terrain: "sand", landmark: "雲舟營地" },
+  grove: { id: "grove", name: "月藤密林", terrain: "vine", landmark: "藤語古徑" },
+  ridge: { id: "ridge", name: "星晶高地", terrain: "crystal", landmark: "碎星斷崖" }
+});
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -51,39 +55,33 @@ export function isInBounds(state, x, y) {
   return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < state.width && y < state.height;
 }
 
-function terrainFor(rng, x, y) {
-  if ((x === 0 && y === 0) || (x === 1 && y === 0) || (x === 0 && y === 1)) return "sand";
-  const roll = rng();
-  if (roll < 0.16) return "crystal";
-  if (roll < 0.42) return "vine";
-  return "sand";
+function regionIdFor(x, y) {
+  // This is a physical island, rather than a shuffled reward board: the beach
+  // grows into a central grove and finally a raised crystal ridge in the east.
+  if (x >= 6 || (x >= 5 && y >= 3) || (x === 5 && y === 7)) return "ridge";
+  if ((x >= 2 && y >= 2) || (x >= 3 && y === 1) || (x === 1 && y >= 5)) return "grove";
+  return "shore";
 }
 
-function chooseTargets(rng, width, height) {
-  const choices = [];
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      if (x + y >= 4 && !(x === width - 1 && y === height - 1)) choices.push({ x, y });
-    }
-  }
+function terrainFor(x, y) {
+  return EXPEDITION_REGIONS[regionIdFor(x, y)].terrain;
+}
 
-  const selected = [];
-  for (const target of TARGETS) {
-    const safeChoices = choices.filter((tile) => selected.every((chosen) => Math.abs(chosen.x - tile.x) + Math.abs(chosen.y - tile.y) >= 4));
-    const pool = safeChoices.length ? safeChoices : choices;
-    const index = Math.floor(rng() * pool.length);
-    const tile = pool[index];
-    selected.push({ ...target, x: tile.x, y: tile.y });
-    choices.splice(choices.findIndex((choice) => choice.x === tile.x && choice.y === tile.y), 1);
-  }
-  return selected;
+export function regionAt(state, x, y) {
+  if (!isInBounds(state, x, y)) return EXPEDITION_REGIONS.shore;
+  const terrainId = state.terrain?.[tileKey(x, y)];
+  return Object.values(EXPEDITION_REGIONS).find((region) => region.terrain === terrainId)
+    ?? EXPEDITION_REGIONS[regionIdFor(x, y)];
+}
+
+function chooseTargets() {
+  return TARGETS.map((target) => ({ ...target }));
 }
 
 export function createExpeditionState(seed = "starsand-001") {
-  const rng = createRng(seed);
   const terrain = {};
   for (let y = 0; y < EXPEDITION_HEIGHT; y += 1) {
-    for (let x = 0; x < EXPEDITION_WIDTH; x += 1) terrain[tileKey(x, y)] = terrainFor(rng, x, y);
+    for (let x = 0; x < EXPEDITION_WIDTH; x += 1) terrain[tileKey(x, y)] = terrainFor(x, y);
   }
 
   return {
@@ -94,7 +92,7 @@ export function createExpeditionState(seed = "starsand-001") {
     height: EXPEDITION_HEIGHT,
     focus: EXPEDITION_FOCUS_MAX,
     terrain,
-    targets: chooseTargets(rng, EXPEDITION_WIDTH, EXPEDITION_HEIGHT),
+    targets: chooseTargets(),
     revealed: [tileKey(0, 0)],
     foundTargetIds: [],
     digs: 0,
@@ -102,7 +100,7 @@ export function createExpeditionState(seed = "starsand-001") {
     lastClue: {
       level: "silent",
       title: "羅盤待命",
-      detail: "從起點相鄰的格子開始調查。",
+      detail: "從雲舟營地旁亮起的星標開始踏查。",
       distance: null
     }
   };
@@ -122,11 +120,17 @@ function uniqueTileKeys(keys, width, height) {
 export function normalizeExpeditionState(raw) {
   if (!raw || typeof raw !== "object" || raw.schemaVersion > EXPEDITION_SCHEMA_VERSION) return createExpeditionState();
   const fallback = createExpeditionState(typeof raw.seed === "string" ? raw.seed : "starsand-001");
-  const terrain = Object.fromEntries(
-    Object.keys(fallback.terrain).map((key) => [key, TERRAIN[raw.terrain?.[key]] ? raw.terrain[key] : fallback.terrain[key]])
-  );
+  // v1 scattered terrain by random roll. Preserve earned progress but migrate
+  // the physical map to the coherent geography used by the new island.
+  const terrain = raw.schemaVersion < EXPEDITION_SCHEMA_VERSION
+    ? fallback.terrain
+    : Object.fromEntries(
+      Object.keys(fallback.terrain).map((key) => [key, TERRAIN[raw.terrain?.[key]] ? raw.terrain[key] : fallback.terrain[key]])
+    );
   const validTargetIds = new Set(fallback.targets.map((target) => target.id));
-  const sourceTargets = Array.isArray(raw.targets) && raw.targets.length === fallback.targets.length ? raw.targets : fallback.targets;
+  const sourceTargets = raw.schemaVersion < EXPEDITION_SCHEMA_VERSION
+    ? fallback.targets
+    : Array.isArray(raw.targets) && raw.targets.length === fallback.targets.length ? raw.targets : fallback.targets;
   const targets = sourceTargets.map((target, index) => {
     const original = fallback.targets[index];
     const x = integer(target?.x, original.x, 0);

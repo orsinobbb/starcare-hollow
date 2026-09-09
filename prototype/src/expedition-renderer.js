@@ -14,9 +14,9 @@ const EXCAVATION_TIMELINE = {
 };
 
 const TERRAIN_COLORS = {
-  sand: { fill: "#aa7a41", edge: "#f1c675", accent: "#ffe4a6" },
-  vine: { fill: "#547a59", edge: "#b8dc84", accent: "#e6f5a5" },
-  crystal: { fill: "#6174a8", edge: "#b9d5ff", accent: "#e5f5ff" }
+  sand: { fill: "#b98448", edge: "#f5d486", accent: "#ffe7ab" },
+  vine: { fill: "#4f805d", edge: "#b9de83", accent: "#e6f5a5" },
+  crystal: { fill: "#596fa4", edge: "#c5d9ff", accent: "#e5f5ff" }
 };
 
 function clamp(value, minimum, maximum) {
@@ -79,7 +79,22 @@ export class ExpeditionRenderer {
   }
 
   setState(state) {
+    const isFirstState = !this.state;
     this.state = state;
+    if (isFirstState) {
+      // Deliberately show the landing camp first. The island is larger than a
+      // phone viewport, so the player discovers it by travelling instead of
+      // seeing a complete square board at once.
+      this.resize();
+      const { halfWidth, halfHeight } = this.viewBounds();
+      // Let the player see both the camp and the first lit excavation mark.
+      // The small overscan is intentional: it frames the shoreline instead of
+      // placing the landing point exactly on the screen edge.
+      this.camera.x = Math.min(Math.max(0, halfWidth - 0.7), this.state.width - halfWidth);
+      this.camera.y = Math.min(Math.max(0, halfHeight - 0.7), this.state.height - halfHeight);
+      this.camera.vx = 0;
+      this.camera.vy = 0;
+    }
     if (!isInBounds(state, this.keyboardTile.x, this.keyboardTile.y)) this.keyboardTile = { x: 0, y: 0 };
     this.constrainCamera();
     this.render();
@@ -122,9 +137,10 @@ export class ExpeditionRenderer {
       this.canvas.width = pixelWidth;
       this.canvas.height = pixelHeight;
     }
-    const columns = this.state?.width ?? EXPEDITION_WIDTH;
-    const rows = this.state?.height ?? EXPEDITION_HEIGHT;
-    this.tileSize = Math.min(76, Math.max(42, Math.min(this.width / Math.max(1, columns - 0.45), this.height / Math.max(1, rows - 0.45))));
+    // Keep the world larger than the viewport. Logical locations are still
+    // deterministic for saving and input, but a phone should feel like it is
+    // looking over a real island, not at all 64 locations as a board.
+    this.tileSize = Math.min(96, Math.max(58, Math.min(this.width / 5.4, this.height / 5.4)));
     this.constrainCamera();
     this.render();
   }
@@ -294,23 +310,45 @@ export class ExpeditionRenderer {
     const maxY = Math.max(halfHeight, this.state.height - halfHeight);
     const minX = Math.min(halfWidth, this.state.width - halfWidth);
     const minY = Math.min(halfHeight, this.state.height - halfHeight);
-    const targetX = clamp(this.camera.x, minX - 0.35, maxX + 0.35);
-    const targetY = clamp(this.camera.y, minY - 0.35, maxY + 0.35);
+    const shorelineOverscan = 0.92;
+    const targetX = clamp(this.camera.x, minX - shorelineOverscan, maxX + shorelineOverscan);
+    const targetY = clamp(this.camera.y, minY - shorelineOverscan, maxY + shorelineOverscan);
     this.camera.x += (targetX - this.camera.x) * (this.pointer ? 0.32 : eased(15 / 60));
     this.camera.y += (targetY - this.camera.y) * (this.pointer ? 0.32 : eased(15 / 60));
   }
 
   screenToTile(clientX, clientY) {
     const rect = this.canvas.getBoundingClientRect();
-    const x = (clientX - rect.left - this.width / 2) / this.tileSize + this.camera.x;
-    const y = (clientY - rect.top - this.height / 2) / this.tileSize + this.camera.y;
-    return { x: Math.floor(x + 0.5), y: Math.floor(y + 0.5) };
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    if (!this.state) return { x: -1, y: -1 };
+
+    // Visual positions deliberately drift a little from the saved lattice, so
+    // a line of excavations reads as a hand-made trail instead of graph paper.
+    // Pick the nearest named dig site rather than assuming a square transform.
+    let closest = { x: -1, y: -1, distance: Infinity };
+    for (let tileY = 0; tileY < this.state.height; tileY += 1) {
+      for (let tileX = 0; tileX < this.state.width; tileX += 1) {
+        const screen = this.tileToScreen(tileX, tileY);
+        const distance = Math.hypot(screen.x - x, screen.y - y);
+        if (distance < closest.distance) closest = { x: tileX, y: tileY, distance };
+      }
+    }
+    return closest.distance <= this.tileSize * 0.68 ? closest : { x: -1, y: -1 };
   }
 
   tileToScreen(x, y) {
+    const drift = this.visualDrift(x, y);
     return {
-      x: this.width / 2 + (x - this.camera.x) * this.tileSize,
-      y: this.height / 2 + (y - this.camera.y) * this.tileSize
+      x: this.width / 2 + (x + drift.x - this.camera.x) * this.tileSize,
+      y: this.height / 2 + (y + drift.y - this.camera.y) * this.tileSize
+    };
+  }
+
+  visualDrift(x, y) {
+    return {
+      x: Math.sin(x * 1.91 + y * 0.73) * 0.075 + Math.cos(x * 0.57 - y * 1.41) * 0.04,
+      y: Math.cos(x * 1.27 - y * 0.61) * 0.07 + Math.sin(x * 0.49 + y * 1.77) * 0.035
     };
   }
 
@@ -472,23 +510,351 @@ export class ExpeditionRenderer {
   }
 
   drawMap(context) {
-    const padding = this.tileSize * 0.06;
     context.save();
     context.translate(this.shake.x, this.shake.y);
+    this.drawIslandBase(context);
+
+    // The logical exploration positions sit inside an irregular coastline.
+    // That preserves deterministic saving without presenting the player with
+    // a literal eight-by-eight board.
+    context.save();
+    this.clipIsland(context);
+
+    // The board only exists in the saved expedition data. The player sees one
+    // painted landmass: sand naturally gives way to the grove and then the
+    // crystal ridge. A dig location is an address on that land, never a tile.
+    this.drawTerrainLandscape(context);
+    this.drawLandmarks(context);
+    this.drawExplorationFog(context);
+
+    // Dig beacons and dug hollows are interaction language laid over the
+    // landscape, rather than visible cell boundaries.
     for (let y = 0; y < this.state.height; y += 1) {
       for (let x = 0; x < this.state.width; x += 1) {
         const screen = this.tileToScreen(x, y);
         if (screen.x < -this.tileSize || screen.y < -this.tileSize || screen.x > this.width + this.tileSize || screen.y > this.height + this.tileSize) continue;
-        const left = screen.x - this.tileSize / 2 + padding;
-        const top = screen.y - this.tileSize / 2 + padding;
-        const size = this.tileSize - padding * 2;
+        const left = screen.x - this.tileSize / 2;
+        const top = screen.y - this.tileSize / 2;
         const revealed = isRevealed(this.state, x, y);
         const selectable = !revealed && this.isSelectable(x, y);
-        this.drawTile(context, x, y, left, top, size, revealed, selectable);
+        this.drawTile(context, x, y, left, top, this.tileSize, revealed, selectable);
       }
     }
     this.drawMiner(context);
     this.drawRewardPopup(context);
+    context.restore();
+    context.restore();
+  }
+
+  drawIslandBase(context) {
+    const start = this.tileToScreen(0, 0);
+    const end = this.tileToScreen(this.state.width - 1, this.state.height - 1);
+    const margin = this.tileSize * 0.78;
+    const left = Math.min(start.x, end.x) - margin;
+    const top = Math.min(start.y, end.y) - margin;
+    const width = Math.abs(end.x - start.x) + margin * 2;
+    const height = Math.abs(end.y - start.y) + margin * 2;
+
+    context.save();
+    const water = context.createRadialGradient(left + width * 0.2, top + height * 0.15, 8, left + width * 0.5, top + height * 0.55, Math.max(width, height));
+    water.addColorStop(0, "rgba(102, 199, 211, 0.35)");
+    water.addColorStop(0.55, "rgba(38, 106, 149, 0.26)");
+    water.addColorStop(1, "rgba(12, 39, 86, 0)");
+    context.fillStyle = water;
+    context.fillRect(left - margin, top - margin, width + margin * 2, height + margin * 2);
+
+    context.globalAlpha = 0.42;
+    context.strokeStyle = "#8ed6e4";
+    context.lineWidth = Math.max(1, this.tileSize * 0.018);
+    for (let index = 0; index < 7; index += 1) {
+      const y = top + (index + 0.6) * height / 7;
+      context.beginPath();
+      context.moveTo(left - margin * 0.38, y);
+      context.bezierCurveTo(left + width * 0.22, y - this.tileSize * 0.13, left + width * 0.7, y + this.tileSize * 0.16, left + width + margin * 0.3, y - this.tileSize * 0.04);
+      context.stroke();
+    }
+    context.restore();
+
+    // A broad coastline makes the landmass read as an island even before the
+    // explorer has uncovered its interior.
+    context.save();
+    this.traceIslandShape(context);
+    context.fillStyle = "rgba(24, 52, 77, 0.68)";
+    context.fill();
+    context.lineWidth = Math.max(4, this.tileSize * 0.19);
+    context.strokeStyle = "rgba(176, 232, 221, 0.42)";
+    context.stroke();
+    context.restore();
+  }
+
+  traceIslandShape(context) {
+    const point = (x, y) => this.tileToScreen(x, y);
+    const start = point(-0.58, 0.42);
+    context.beginPath();
+    context.moveTo(start.x, start.y);
+    const curves = [
+      [[-0.22, -0.42], [1.05, -0.48], [1.78, -0.3]],
+      [[2.72, -0.62], [3.72, -0.35], [4.5, -0.46]],
+      [[5.52, -0.7], [6.78, -0.46], [7.35, 0.24]],
+      [[7.72, 1.12], [7.35, 2.14], [7.64, 2.98]],
+      [[7.98, 3.96], [7.42, 4.78], [7.66, 5.75]],
+      [[7.86, 6.72], [7.26, 7.42], [6.18, 7.48]],
+      [[5.1, 7.72], [4.16, 7.38], [3.18, 7.62]],
+      [[2.1, 7.88], [1.04, 7.38], [0.25, 7.56]],
+      [[-0.52, 7.2], [-0.68, 6.1], [-0.46, 5.16]],
+      [[-0.72, 4.02], [-0.38, 3.18], [-0.6, 2.26]],
+      [[-0.82, 1.4], [-0.62, 0.78], [-0.58, 0.42]]
+    ];
+    for (const [first, second, end] of curves) {
+      const controlOne = point(...first);
+      const controlTwo = point(...second);
+      const destination = point(...end);
+      context.bezierCurveTo(controlOne.x, controlOne.y, controlTwo.x, controlTwo.y, destination.x, destination.y);
+    }
+    context.closePath();
+  }
+
+  clipIsland(context) {
+    this.traceIslandShape(context);
+    context.clip();
+  }
+
+  drawTerrainLandscape(context) {
+    const point = (x, y) => this.tileToScreen(x, y);
+    const northwest = point(-0.85, -0.72);
+    const southeast = point(7.9, 7.9);
+    const width = southeast.x - northwest.x;
+    const height = southeast.y - northwest.y;
+
+    // 1. The entire island begins as a continuous sandy shore. Repeating
+    // strokes, not square texture stamps, give it a material surface.
+    context.save();
+    const sand = context.createLinearGradient(northwest.x, northwest.y, southeast.x, southeast.y);
+    sand.addColorStop(0, "#dfbd77");
+    sand.addColorStop(0.44, "#bc884d");
+    sand.addColorStop(1, "#76503c");
+    context.fillStyle = sand;
+    context.fillRect(northwest.x, northwest.y, width, height);
+    context.globalAlpha = 0.24;
+    context.strokeStyle = "#ffe2a3";
+    context.lineWidth = Math.max(1, this.tileSize * 0.026);
+    for (let index = 0; index < 12; index += 1) {
+      const x = northwest.x + ((index * 137) % Math.max(1, width));
+      const y = northwest.y + ((index * 79 + 31) % Math.max(1, height));
+      context.beginPath();
+      context.bezierCurveTo(x - this.tileSize * 0.24, y + this.tileSize * 0.08, x - this.tileSize * 0.06, y - this.tileSize * 0.12, x + this.tileSize * 0.28, y + this.tileSize * 0.04, x + this.tileSize * 0.52, y - this.tileSize * 0.11);
+      context.stroke();
+    }
+    context.restore();
+
+    // 2. A single leaf canopy covers exactly the middle of the island where
+    // vine terrain is stored. Its irregular edge avoids a hard region seam.
+    const grove = [
+      // This canopy deliberately encloses every saved vine site, including
+      // the first story find at (3, 1), rather than merely suggesting a
+      // forest nearby.
+      [1.24, 2.16], [2.12, 1.16], [2.76, 0.78], [4.02, 0.92], [4.9, 1.6],
+      [5.48, 2.82], [5.18, 4.38], [4.78, 5.9], [3.48, 6.9],
+      [2.04, 6.3], [0.72, 5.58], [0.78, 4.7], [1.3, 3.76]
+    ];
+    context.save();
+    context.beginPath();
+    const firstGrove = point(...grove[0]);
+    context.moveTo(firstGrove.x, firstGrove.y);
+    for (let index = 0; index < grove.length; index += 1) {
+      const current = grove[index];
+      const next = grove[(index + 1) % grove.length];
+      const currentPoint = point(...current);
+      const nextPoint = point(...next);
+      const midpoint = { x: (currentPoint.x + nextPoint.x) / 2, y: (currentPoint.y + nextPoint.y) / 2 };
+      context.quadraticCurveTo(currentPoint.x, currentPoint.y, midpoint.x, midpoint.y);
+    }
+    context.closePath();
+    const leaf = context.createRadialGradient(point(3.25, 3.7).x, point(3.25, 3.7).y, this.tileSize * 0.18, point(3.25, 3.7).x, point(3.25, 3.7).y, this.tileSize * 4.1);
+    leaf.addColorStop(0, "#9fc776");
+    leaf.addColorStop(0.55, "#4e835b");
+    leaf.addColorStop(1, "#294d45");
+    context.fillStyle = leaf;
+    context.fill();
+    context.globalAlpha = 0.34;
+    context.strokeStyle = "#d9f4a0";
+    context.lineWidth = Math.max(1.1, this.tileSize * 0.024);
+    for (const [x, y, bend] of [[2.1, 2.55, -1], [3.2, 2.08, 1], [4.1, 2.92, -1], [2.16, 4.22, 1], [3.38, 4.62, -1], [4.42, 5.38, 1], [2.86, 5.82, -1]]) {
+      const start = point(x - 0.3, y + 0.28);
+      const end = point(x + 0.32, y - 0.3);
+      context.beginPath();
+      context.moveTo(start.x, start.y);
+      context.quadraticCurveTo(point(x, y + bend * 0.42).x, point(x, y + bend * 0.42).y, end.x, end.y);
+      context.stroke();
+    }
+    context.restore();
+
+    // 3. The right-hand highland is a single rock formation. The stored
+    // crystal positions live inside this silhouette, so the reward type and
+    // the place the player sees always agree.
+    context.save();
+    context.beginPath();
+    const ridgeStart = point(4.76, 2.12);
+    context.moveTo(ridgeStart.x, ridgeStart.y);
+    const ridge = [
+      [[5.8, 1.18], [6.84, 0.78], [7.7, 1.18]],
+      [[8.15, 2.1], [7.5, 3.04], [7.78, 3.82]],
+      [[8.14, 4.78], [7.5, 5.9], [7.72, 7.28]],
+      [[6.7, 7.5], [5.58, 6.88], [5.12, 5.78]],
+      [[4.56, 4.96], [4.7, 3.54], [4.74, 2.76]],
+      [[4.7, 2.38], [4.66, 2.18], [4.76, 2.12]]
+    ];
+    for (const [controlOne, controlTwo, end] of ridge) {
+      const c1 = point(...controlOne);
+      const c2 = point(...controlTwo);
+      const destination = point(...end);
+      context.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, destination.x, destination.y);
+    }
+    context.closePath();
+    const rock = context.createLinearGradient(point(5.1, 1.4).x, point(5.1, 1.4).y, point(7.85, 6.8).x, point(7.85, 6.8).y);
+    rock.addColorStop(0, "#90a5d4");
+    rock.addColorStop(0.48, "#596e9d");
+    rock.addColorStop(1, "#29395f");
+    context.fillStyle = rock;
+    context.fill();
+    context.globalAlpha = 0.42;
+    context.strokeStyle = "#d6eaff";
+    context.lineWidth = Math.max(1.2, this.tileSize * 0.026);
+    for (const [x, y, heightScale] of [[6.0, 2.18, 0.74], [6.8, 2.7, 1], [5.86, 3.8, 0.62], [7.05, 4.55, 0.9], [6.16, 5.5, 0.66], [7.15, 6.35, 0.78]]) {
+      const base = point(x, y + 0.35);
+      const peak = point(x + 0.1, y - heightScale * 0.44);
+      const right = point(x + 0.34, y + 0.34);
+      context.beginPath();
+      context.moveTo(base.x, base.y);
+      context.lineTo(peak.x, peak.y);
+      context.lineTo(right.x, right.y);
+      context.stroke();
+    }
+    context.restore();
+
+    // A soft travel trail makes the natural player intent clear: begin at
+    // camp, follow the coast through the grove, then reach the highland.
+    context.save();
+    const trail = [point(0.1, 0.12), point(1.25, 1.06), point(2.08, 2.42), point(3.28, 3.08), point(4.48, 3.88), point(5.78, 4.42)];
+    context.globalAlpha = 0.24;
+    context.strokeStyle = "#ffe9a7";
+    context.lineWidth = Math.max(2, this.tileSize * 0.1);
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.beginPath();
+    context.moveTo(trail[0].x, trail[0].y);
+    for (let index = 1; index < trail.length - 1; index += 1) {
+      const current = trail[index];
+      const next = trail[index + 1];
+      context.quadraticCurveTo(current.x, current.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
+    }
+    context.lineTo(trail.at(-1).x, trail.at(-1).y);
+    context.stroke();
+    context.restore();
+  }
+
+  drawLandmarks(context) {
+    const camp = this.tileToScreen(0, 0);
+    const grove = this.tileToScreen(3.5, 3.6);
+    const ridge = this.tileToScreen(6.3, 3.1);
+    const scale = this.tileSize;
+    context.save();
+
+    // A small field camp gives the player an unambiguous "we arrived here".
+    context.translate(camp.x - scale * 0.1, camp.y + scale * 0.04);
+    context.fillStyle = "rgba(42, 31, 35, 0.9)";
+    context.beginPath();
+    context.moveTo(-scale * 0.3, scale * 0.2);
+    context.lineTo(0, -scale * 0.26);
+    context.lineTo(scale * 0.3, scale * 0.2);
+    context.closePath();
+    context.fill();
+    context.fillStyle = "#eecb84";
+    context.beginPath();
+    context.moveTo(-scale * 0.08, scale * 0.18);
+    context.lineTo(0, -scale * 0.1);
+    context.lineTo(scale * 0.08, scale * 0.18);
+    context.closePath();
+    context.fill();
+    context.restore();
+
+    context.save();
+    context.globalAlpha = 0.42;
+    context.strokeStyle = "#d2f3a1";
+    context.lineWidth = Math.max(1.2, scale * 0.035);
+    for (let index = 0; index < 4; index += 1) {
+      context.beginPath();
+      context.moveTo(grove.x - scale * (0.52 - index * 0.13), grove.y + scale * 0.45);
+      context.quadraticCurveTo(grove.x - scale * (0.14 - index * 0.1), grove.y - scale * 0.38, grove.x + scale * (0.35 + index * 0.07), grove.y - scale * 0.05);
+      context.stroke();
+    }
+    context.fillStyle = "rgba(212, 244, 164, 0.42)";
+    for (let index = 0; index < 7; index += 1) {
+      context.beginPath();
+      context.arc(grove.x + ((index % 3) - 1) * scale * 0.19, grove.y + (Math.floor(index / 3) - 1) * scale * 0.18, scale * 0.14, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.restore();
+
+    context.save();
+    context.globalAlpha = 0.58;
+    context.fillStyle = "#d7e9ff";
+    context.strokeStyle = "#7899dd";
+    context.lineWidth = Math.max(1, scale * 0.025);
+    for (let index = 0; index < 4; index += 1) {
+      const x = ridge.x + (index - 1.5) * scale * 0.19;
+      const peak = ridge.y - scale * (0.42 + (index % 2) * 0.18);
+      context.beginPath();
+      context.moveTo(x - scale * 0.14, ridge.y + scale * 0.38);
+      context.lineTo(x, peak);
+      context.lineTo(x + scale * 0.14, ridge.y + scale * 0.38);
+      context.closePath();
+      context.fill();
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  drawExplorationFog(context) {
+    const start = this.tileToScreen(-0.7, -0.7);
+    const end = this.tileToScreen(this.state.width - 0.05, this.state.height - 0.05);
+    const left = Math.min(start.x, end.x) - this.tileSize;
+    const top = Math.min(start.y, end.y) - this.tileSize;
+    const width = Math.abs(end.x - start.x) + this.tileSize * 2;
+    const height = Math.abs(end.y - start.y) + this.tileSize * 2;
+
+    // Mist conceals secrets, not the ground itself. The land stays legible as
+    // a coherent island; only the bright beacons and excavated hollows tell
+    // the player what has actually been explored.
+    context.save();
+    const mist = context.createLinearGradient(left, top, left + width, top + height);
+    mist.addColorStop(0, "rgba(24, 50, 83, 0.16)");
+    mist.addColorStop(0.55, "rgba(19, 43, 73, 0.32)");
+    mist.addColorStop(1, "rgba(12, 31, 60, 0.42)");
+    context.fillStyle = mist;
+    context.fillRect(left, top, width, height);
+
+    context.globalAlpha = 0.28;
+    for (const [x, y, radius] of [[1.45, 1.15, 1.15], [4.35, 2.2, 1.45], [6.72, 5.3, 1.32]]) {
+      const screen = this.tileToScreen(x, y);
+      const haze = context.createRadialGradient(screen.x, screen.y, this.tileSize * 0.06, screen.x, screen.y, this.tileSize * radius);
+      haze.addColorStop(0, "rgba(222, 239, 250, 0.3)");
+      haze.addColorStop(1, "rgba(222, 239, 250, 0)");
+      context.fillStyle = haze;
+      context.beginPath();
+      context.arc(screen.x, screen.y, this.tileSize * radius, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.globalAlpha = 0.18;
+    context.strokeStyle = "#b8d9e9";
+    context.lineWidth = Math.max(1, this.tileSize * 0.018);
+    for (let index = 0; index < 5; index += 1) {
+      const y = top + (index + 1) * height / 6;
+      context.beginPath();
+      context.bezierCurveTo(left, y, left + width * 0.32, y - this.tileSize * 0.12, left + width * 0.64, y + this.tileSize * 0.12, left + width, y - this.tileSize * 0.04);
+      context.stroke();
+    }
     context.restore();
   }
 
@@ -499,63 +865,71 @@ export class ExpeditionRenderer {
   drawTile(context, x, y, left, top, size, revealed, selectable) {
     const isKeyboardTile = this.keyboardTile.x === x && this.keyboardTile.y === y;
     const isHoverTile = this.hoverTile?.x === x && this.hoverTile?.y === y;
-    const radius = Math.max(8, size * 0.18);
-    context.save();
-    context.shadowColor = "rgba(2, 7, 19, 0.4)";
-    context.shadowBlur = 8;
-    context.shadowOffsetY = 4;
-    drawRoundedRect(context, left, top, size, size, radius);
-    context.fillStyle = revealed ? "#3c624c" : "#27375c";
-    context.fill();
-    context.restore();
-
+    const centerX = left + size / 2;
+    const centerY = top + size / 2;
     if (revealed) {
-      const terrain = terrainAt(this.state, x, y);
-      const colors = TERRAIN_COLORS[terrain.id];
-      const fill = context.createLinearGradient(left, top, left + size, top + size);
-      fill.addColorStop(0, colors.accent);
-      fill.addColorStop(0.23, colors.fill);
-      fill.addColorStop(1, "#263d50");
-      drawRoundedRect(context, left, top, size, size, radius);
-      context.fillStyle = fill;
-      context.fill();
-      context.strokeStyle = colors.edge;
-      context.lineWidth = 1.25;
-      context.stroke();
-      this.drawTerrainDetails(context, terrain.id, left, top, size, colors);
+      this.drawExcavatedSite(context, centerX, centerY, size, terrainAt(this.state, x, y).id);
       const target = targetAt(this.state, x, y);
       const animation = this.activeExcavationAt(x, y);
       if (target && this.state.foundTargetIds.includes(target.id)) {
-        this.drawRelic(context, target, left + size / 2, top + size / 2, size, this.relicRevealProgress(animation));
+        this.drawRelic(context, target, centerX, centerY, size, this.relicRevealProgress(animation));
       }
-    } else {
-      const fog = context.createLinearGradient(left, top, left + size, top + size);
-      fog.addColorStop(0, "#5f69a0");
-      fog.addColorStop(0.52, "#34446f");
-      fog.addColorStop(1, "#1e2b50");
-      drawRoundedRect(context, left, top, size, size, radius);
-      context.fillStyle = fog;
-      context.fill();
-      context.strokeStyle = selectable ? "rgba(206, 245, 187, 0.76)" : "rgba(180, 203, 255, 0.24)";
-      context.lineWidth = selectable ? 2 : 1;
-      context.stroke();
-      context.fillStyle = "rgba(220, 235, 255, 0.46)";
-      context.font = `${Math.max(13, size * 0.37)}px Georgia, serif`;
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      context.fillText(selectable ? "✦" : "·", left + size / 2, top + size / 2 + 1);
-    }
+    } else if (selectable) this.drawFrontierBeacon(context, centerX, centerY, size);
 
     if (isKeyboardTile || isHoverTile) {
-      drawRoundedRect(context, left - 2, top - 2, size + 4, size + 4, radius + 2);
+      context.save();
       context.strokeStyle = isKeyboardTile ? "#fff0a2" : "#c9f6cd";
       context.lineWidth = isKeyboardTile ? 2.6 : 1.7;
+      context.beginPath();
+      context.arc(centerX, centerY, size * 0.34, 0, Math.PI * 2);
       context.stroke();
+      context.restore();
     }
 
     const animation = this.activeExcavationAt(x, y);
-    if (animation) this.drawExcavationOverlay(context, animation, left, top, size, radius);
-    if (this.queuedTile?.x === x && this.queuedTile?.y === y) this.drawQueuedMarker(context, left, top, size, radius);
+    if (animation) this.drawExcavationOverlay(context, animation, left, top, size, Math.max(8, size * 0.18));
+    if (this.queuedTile?.x === x && this.queuedTile?.y === y) this.drawQueuedMarker(context, left, top, size, Math.max(8, size * 0.18));
+  }
+
+  drawFrontierBeacon(context, x, y, size) {
+    context.save();
+    const pulse = 0.58 + Math.sin(performance.now() / 260) * 0.16;
+    const glow = context.createRadialGradient(x, y, size * 0.05, x, y, size * 0.42);
+    glow.addColorStop(0, "rgba(255, 242, 181, 0.72)");
+    glow.addColorStop(1, "rgba(215, 244, 185, 0)");
+    context.fillStyle = glow;
+    context.beginPath();
+    context.arc(x, y, size * 0.42, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = pulse;
+    context.strokeStyle = "#d7f4b9";
+    context.lineWidth = Math.max(1.4, size * 0.04);
+    context.beginPath();
+    context.arc(x, y, size * 0.23, 0, Math.PI * 2);
+    context.stroke();
+    context.fillStyle = "#fff2b5";
+    context.font = `bold ${Math.max(12, size * 0.25)}px Georgia, serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("✦", x, y + 1);
+    context.restore();
+  }
+
+  drawExcavatedSite(context, x, y, size, terrainId) {
+    const soil = terrainId === "crystal" ? "#3c4e79" : terrainId === "vine" ? "#315a43" : "#795137";
+    context.save();
+    context.globalAlpha = 0.6;
+    context.fillStyle = soil;
+    context.beginPath();
+    context.ellipse(x, y + size * 0.07, size * 0.28, size * 0.18, -0.08, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = 0.52;
+    context.strokeStyle = "#f5d99a";
+    context.lineWidth = Math.max(1, size * 0.022);
+    context.beginPath();
+    context.arc(x, y + size * 0.05, size * 0.21, Math.PI * 0.12, Math.PI * 0.88);
+    context.stroke();
+    context.restore();
   }
 
   activeExcavationAt(x, y) {
@@ -592,16 +966,14 @@ export class ExpeditionRenderer {
     if (reveal < 1) {
       context.save();
       context.globalAlpha = 1 - reveal;
-      const cover = context.createLinearGradient(left, top, left + size, top + size);
+      const cover = context.createRadialGradient(centerX, centerY, size * 0.06, centerX, centerY, size * 0.78);
       cover.addColorStop(0, "#6071a5");
       cover.addColorStop(0.55, "#2e416a");
-      cover.addColorStop(1, "#17294e");
-      drawRoundedRect(context, left, top, size, size, radius);
+      cover.addColorStop(1, "rgba(23, 41, 78, 0)");
+      context.beginPath();
+      context.arc(centerX, centerY, size * 0.76, 0, Math.PI * 2);
       context.fillStyle = cover;
       context.fill();
-      context.strokeStyle = "rgba(221, 234, 255, 0.48)";
-      context.lineWidth = 1.4;
-      context.stroke();
       context.restore();
     }
 
@@ -643,12 +1015,15 @@ export class ExpeditionRenderer {
 
   drawQueuedMarker(context, left, top, size, radius) {
     const pulse = 0.5 + Math.sin(performance.now() / 180) * 0.14;
+    const centerX = left + size / 2;
+    const centerY = top + size / 2;
     context.save();
     context.globalAlpha = pulse;
     context.setLineDash([Math.max(3, size * 0.09), Math.max(2, size * 0.06)]);
     context.strokeStyle = "#fff0a5";
     context.lineWidth = Math.max(1.5, size * 0.04);
-    drawRoundedRect(context, left - 4, top - 4, size + 8, size + 8, radius + 4);
+    context.beginPath();
+    context.arc(centerX, centerY, size * 0.38, 0, Math.PI * 2);
     context.stroke();
     context.setLineDash([]);
     context.globalAlpha = 0.94;
@@ -656,7 +1031,7 @@ export class ExpeditionRenderer {
     context.font = `bold ${Math.max(9, size * 0.16)}px system-ui, sans-serif`;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText("下一鏟", left + size / 2, top - Math.max(8, size * 0.1));
+    context.fillText("下一鏟", centerX, top - Math.max(8, size * 0.1));
     context.restore();
   }
 

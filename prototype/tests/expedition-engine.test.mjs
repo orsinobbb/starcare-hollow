@@ -8,6 +8,7 @@ import {
   createExpeditionState,
   excavate,
   normalizeExpeditionState,
+  regionAt,
   tileKey
 } from "../src/expedition-engine.js";
 
@@ -99,4 +100,25 @@ test("malformed expedition snapshots normalize to a safe playable map", () => {
   assert.deepEqual(migrated.revealed, ["0,0"]);
   assert.equal(migrated.foundTargetIds.length, 0);
   assert.equal(migrated.targets.length, 3);
+});
+
+test("a v1 save retains earned progress while adopting the coherent island geography", () => {
+  const legacy = createExpeditionState("old-island");
+  legacy.schemaVersion = 1;
+  legacy.focus = 12;
+  legacy.digs = 5;
+  legacy.terrain["1,0"] = "crystal";
+  legacy.revealed = ["0,0", "1,0", "1,1"];
+  legacy.foundTargetIds = ["tide-shell"];
+
+  const migrated = normalizeExpeditionState(legacy);
+
+  assert.equal(migrated.schemaVersion, 2);
+  assert.equal(migrated.focus, 12);
+  assert.equal(migrated.digs, 5);
+  assert.deepEqual(migrated.revealed, ["0,0", "1,0", "1,1"]);
+  assert.deepEqual(migrated.foundTargetIds, ["tide-shell"]);
+  assert.equal(migrated.terrain["1,0"], "sand", "old shuffled terrain becomes one continuous shore");
+  assert.equal(regionAt(migrated, 3, 3).id, "grove");
+  assert.equal(regionAt(migrated, 6, 3).id, "ridge");
 });

@@ -9,7 +9,7 @@
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.7.0" />
+    <link rel="stylesheet" href="./styles.css?v=0.8.0" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.7.0</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.8.0</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -281,9 +281,9 @@
         <section id="expedition-view" class="expedition-view" hidden aria-labelledby="expedition-title">
           <section class="expedition-banner">
             <div>
-              <p class="eyebrow">星砂群島 · 可玩技術切片</p>
-              <h2 id="expedition-title">星脈遠征</h2>
-              <p>點已開啟格旁邊的迷霧，派遣挖礦者逐格調查；每格固定帶回材料，羅盤則提示主要寶物有多近。專注不足時，用小鎮藥園採收的月芽葉補給。</p>
+              <p class="eyebrow">第一座探索島 · 自動保存</p>
+              <h2 id="expedition-title">穹星海岬</h2>
+              <p>從雲舟營地出發，穿過晨潮沙灣、月藤密林與星晶高地。跟著亮起的星標前進：每一處地貌都會留下材料、線索或遺物，而羅盤會告訴你寶物是否接近。</p>
             </div>
             <button id="expedition-return" class="secondary-button" type="button">帶著成果回小鎮</button>
           </section>
@@ -292,25 +292,25 @@
             <section class="expedition-map-card" aria-labelledby="expedition-map-title">
               <div class="section-heading expedition-map-heading">
                 <div>
-                  <p class="eyebrow">可拖曳地圖 · 點格調查</p>
-                  <h3 id="expedition-map-title">雲海下的星砂層</h3>
+                  <p class="eyebrow">可拖曳的探索世界</p>
+                  <h3 id="expedition-map-title">晨潮沙灣 → 月藤密林 → 星晶高地</h3>
                 </div>
                 <span class="map-status-chip">自動儲存</span>
               </div>
               <canvas id="expedition-canvas" tabindex="0" aria-label="星砂群島探索地圖" aria-describedby="expedition-map-help"></canvas>
               <div id="expedition-stage" class="expedition-stage" data-stage="ready" role="status" aria-live="polite">
                 <span aria-hidden="true">⌁</span>
-                <p>挖礦者會前往目標、落鏟、翻土，再把每格成果清楚交到你手上。</p>
+                <p>挖礦者會前往星標、落鏟、翻開地貌，再把每處成果清楚交到你手上。</p>
               </div>
-              <p id="expedition-map-help" class="expedition-map-help">地圖內：單指拖曳移動鏡頭，輕點相鄰迷霧格派遣挖礦者。進行中可標記一格「下一鏟」；挖礦者收下目前成果後就會前往。每格都有材料，遺物是額外大獎。鍵盤可用方向鍵選格、Enter 調查；世界採固定比例，雙指不會改變世界或按鈕位置。</p>
-              <p id="expedition-log" class="expedition-log" role="status" aria-live="polite">羅盤待命：從起點相鄰的格子開始調查。</p>
+              <p id="expedition-map-help" class="expedition-map-help"><strong>現在做什麼：</strong>輕觸營地旁亮起的星標，挖礦者就會前往。她正在作業時，仍可輕觸另一個可達星標預約「下一鏟」；目前成果會先完整顯現，再出發。單指拖曳可看地貌，世界比例固定，雙指不會縮放世界。</p>
+              <p id="expedition-log" class="expedition-log" role="status" aria-live="polite">雲舟營地已靠岸：先選擇旁邊亮起的星標，開始踏查晨潮沙灣。</p>
             </section>
 
             <aside class="expedition-side-panel" aria-labelledby="compass-title">
               <section id="expedition-compass" class="compass-card" data-clue="silent">
                 <p class="eyebrow">距離線索</p>
                 <h3 id="compass-title"><span id="expedition-clue-title">羅盤待命</span></h3>
-                <p id="expedition-clue-detail">從起點相鄰的格子開始調查。</p>
+                <p id="expedition-clue-detail">從營地旁亮起的星標開始踏查。</p>
                 <span class="compass-ring" aria-hidden="true">✦</span>
               </section>
 
@@ -323,24 +323,24 @@
               </section>
 
               <section class="excavation-card" aria-labelledby="selected-title">
-                <p class="eyebrow">本次操作</p>
-                <h3 id="selected-title"><span id="expedition-selected">座標 2 · 1</span></h3>
-                <p id="expedition-selected-detail">星砂 · 調查消耗 1 專注</p>
+                <p class="eyebrow">下一個探索點</p>
+                <h3 id="selected-title"><span id="expedition-selected">晨潮沙灣 · 潮痕淺灘</span></h3>
+                <p id="expedition-selected-detail">星砂地貌 · 踏查消耗 1 專注</p>
                 <p id="expedition-queue" class="expedition-queue" aria-live="polite">下一鏟：尚未標記</p>
-                <button id="expedition-dig" class="primary-button" type="button">派遣挖礦者：星砂（-1）</button>
-                <div id="expedition-map-controls" class="expedition-map-controls" aria-label="選擇地圖格子">
-                  <span></span><button type="button" data-expedition-move="0,-1" aria-label="往上選格">↑</button><span></span>
-                  <button type="button" data-expedition-move="-1,0" aria-label="往左選格">←</button><span class="map-control-center" aria-hidden="true">◎</span><button type="button" data-expedition-move="1,0" aria-label="往右選格">→</button>
-                  <span></span><button type="button" data-expedition-move="0,1" aria-label="往下選格">↓</button><span></span>
+                <button id="expedition-dig" class="primary-button" type="button">前往潮痕淺灘踏查（-1）</button>
+                <div id="expedition-map-controls" class="expedition-map-controls" aria-label="改選相鄰探索點">
+                  <span></span><button type="button" data-expedition-move="0,-1" aria-label="選擇北側探索點">↑</button><span></span>
+                  <button type="button" data-expedition-move="-1,0" aria-label="選擇西側探索點">←</button><span class="map-control-center" aria-hidden="true">✦</span><button type="button" data-expedition-move="1,0" aria-label="選擇東側探索點">→</button>
+                  <span></span><button type="button" data-expedition-move="0,1" aria-label="選擇南側探索點">↓</button><span></span>
                 </div>
               </section>
 
               <section class="expedition-principles" aria-label="遠征保護規則">
                 <strong>安心探索</strong>
                 <ul>
-                  <li>已翻開地格與找到的寶物永久保存。</li>
-                  <li>專注不足時用月芽暖茶補給；月芽葉來自小鎮藥園與藤蔓地層，居民委託可留到明日。</li>
-                  <li>每次挖掘都先顯示移動、翻土與每格回饋；收下成果後才開始下一鏟。</li>
+                  <li>已踏查的地點與找到的寶物永久保存。</li>
+                  <li>專注不足時用月芽暖茶補給；月芽葉來自小鎮藥園與月藤密林，居民委託可留到明日。</li>
+                  <li>每次踏查都先顯示移動、翻土與成果；可預約下一鏟，但不會跳過正在發生的回饋。</li>
                 </ul>
               </section>
             </aside>
@@ -532,6 +532,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.7.0"></script>
+    <script type="module" src="./src/app.js?v=0.8.0"></script>
   </body>
 </html>

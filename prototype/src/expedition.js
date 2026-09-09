@@ -1,4 +1,4 @@
-import { EXPEDITION_FOCUS_MAX, canExcavate, createExpeditionState, excavate, isInBounds, terrainAt } from "./expedition-engine.js";
+import { EXPEDITION_FOCUS_MAX, canExcavate, createExpeditionState, excavate, isInBounds, regionAt, terrainAt } from "./expedition-engine.js";
 import {
   COMMISSION_MOONLEAF_COST,
   EXPEDITION_FOCUS_MOONLEAF_COST,
@@ -49,11 +49,11 @@ export function createExpeditionController({ root = document, townController, on
     onStage: ({ stage, event }) => {
       const stageCopy = {
         walk: ["♟", "挖礦者正走向標記地點。"],
-        aim: ["⌁", "先讓鏟尖定位，準備翻開這一格。"],
+        aim: ["⌁", "先讓鏟尖定位，準備翻開眼前的地貌。"],
         impact: ["✦", "鏟尖落下，地層正在鬆動。"],
         reveal: ["◌", `正在翻開${event.terrain.name}，請看清楚地表回應。`],
         discovery: ["✧", `星光浮現：${event.discovery?.name ?? "遺物"} 正在顯影！`],
-        reward: ["＋", `成果浮現：${formatReward(event.reward)} 已準備收下。`],
+        reward: ["＋", `成果浮現：${formatReward(event.reward)} 正在交到你的行囊。`],
         settle: ["✓", "地層穩定中，遠征成果即將收下。"]
       };
       const [icon, text] = stageCopy[stage] ?? ["⌁", "遠征進行中。"];
@@ -71,8 +71,20 @@ export function createExpeditionController({ root = document, townController, on
     return terrainAt(state, selectedTile.x, selectedTile.y);
   }
 
+  function locationNameFor(x, y) {
+    const region = regionAt(state, x, y);
+    const localities = {
+      shore: ["雲舟營地旁", "潮痕淺灘", "貝風坡", "暖沙灣", "潮池邊"],
+      grove: ["藤語古徑", "月藤樹根", "螢葉小徑", "露珠空地", "花蔭深處"],
+      ridge: ["碎星斷崖", "晶脈坡", "雲階石壁", "回聲礦脈", "高地望台"]
+    };
+    const names = localities[region.id] ?? localities.shore;
+    const locality = names[(x * 3 + y * 5) % names.length];
+    return `${region.name} · ${locality}`;
+  }
+
   function formatReward(reward = {}) {
-    const labels = { coins: "星幣", moonleaf: "月芽葉", timber: "暖木", starlight: "星砂" };
+    const labels = { coins: "星幣", moonleaf: "月芽葉", timber: "暖木", starlight: "星光" };
     const text = Object.entries(reward)
       .filter(([, amount]) => Number(amount) > 0)
       .map(([resource, amount]) => `${labels[resource] ?? resource} +${amount}`)
@@ -84,35 +96,36 @@ export function createExpeditionController({ root = document, townController, on
     if (!isInBounds(state, selectedTile.x, selectedTile.y)) selectedTile = { x: 0, y: 0 };
     const terrain = selectedTerrain();
     const permission = canExcavate(state, selectedTile.x, selectedTile.y);
-    if (ui.selected) ui.selected.textContent = `座標 ${selectedTile.x + 1} · ${selectedTile.y + 1}`;
+    const location = locationNameFor(selectedTile.x, selectedTile.y);
+    if (ui.selected) ui.selected.textContent = location;
     const queued = queuedTile && queuedTile.x === selectedTile.x && queuedTile.y === selectedTile.y;
     if (ui.selectedDetail) {
       ui.selectedDetail.textContent = isAnimating
         ? queued
-          ? `${terrain.name} 已標記為下一鏟；目前這一鏟的獎勵正在完整顯現。`
-          : `${terrain.name} 正在翻開；現在可點選一格排程下一鏟。`
+          ? `${location} 已標記為下一鏟；目前這一鏟的獎勵正在完整顯現。`
+          : `正在翻開地貌；現在可輕觸另一個可達星標，預約下一鏟。`
         : permission.ok
-        ? `${terrain.name} · 調查消耗 ${terrain.cost} 專注`
+        ? `${terrain.name}地貌 · 踏查消耗 ${terrain.cost} 專注`
         : permission.reason === "focus"
         ? `${permission.message} 月芽暖茶可回復專注。`
         : permission.message;
     }
     if (ui.queue) {
       ui.queue.textContent = queuedTile
-        ? `下一鏟：座標 ${queuedTile.x + 1} · ${queuedTile.y + 1}（可再點其他合法格改派）`
+        ? `下一鏟：${locationNameFor(queuedTile.x, queuedTile.y)}（可改選另一個可達星標）`
         : isAnimating
-        ? "下一鏟：現在可標記一個合法相鄰格"
+        ? "下一鏟：現在可標記一個可達星標"
         : "下一鏟：尚未標記";
     }
     if (ui.dig) {
       ui.dig.disabled = !permission.ok;
       ui.dig.textContent = isAnimating
         ? permission.ok
-          ? queued ? `已排程下一鏟：${terrain.name}` : `標記下一鏟：${terrain.name}（-${terrain.cost}）`
-          : "此格目前不能排程"
+          ? queued ? `已預約下一鏟：${terrain.name}` : `預約下一鏟：${terrain.name}（-${terrain.cost}）`
+          : "這裡目前還不能前往"
         : permission.ok
-        ? `派遣挖礦者：${terrain.name}（-${terrain.cost}）`
-        : "此格目前不能調查";
+        ? `前往${location.split(" · ")[1]}踏查（-${terrain.cost}）`
+        : "這裡目前還不能踏查";
     }
     canvas.setAttribute("aria-busy", String(isAnimating));
   }
@@ -150,11 +163,12 @@ export function createExpeditionController({ root = document, townController, on
     const found = state.foundTargetIds.length;
     if (ui.focus) ui.focus.textContent = `${state.focus} / ${EXPEDITION_FOCUS_MAX}`;
     if (ui.relics) ui.relics.textContent = `${found} / ${state.targets.length}`;
-    if (ui.progress) ui.progress.textContent = `已調查 ${state.revealed.length} 格`;
+    const explored = Math.max(0, state.revealed.length - 1);
+    if (ui.progress) ui.progress.textContent = `已踏查 ${explored} 處`;
     if (ui.clueTitle) ui.clueTitle.textContent = state.lastClue.title;
     if (ui.clueDetail) ui.clueDetail.textContent = state.lastClue.detail;
     if (ui.compass) ui.compass.dataset.clue = state.lastClue.level;
-    canvas.setAttribute("aria-label", `星砂群島探索地圖。已調查 ${state.revealed.length} 格，找到 ${found} / ${state.targets.length} 件主要寶物。使用方向鍵移動選格，Enter 調查。`);
+    canvas.setAttribute("aria-label", `穹星海岬探索地圖。已踏查 ${explored} 處，找到 ${found} / ${state.targets.length} 件主要遺物。使用方向鍵選擇探索點，Enter 踏查。`);
     renderer.setState(state);
     renderSelection();
     renderSupply();
@@ -186,8 +200,8 @@ export function createExpeditionController({ root = document, townController, on
     queuedTile = { x, y };
     selectedTile = { x, y };
     renderer.setQueuedTile(queuedTile);
-    updateStage("queued", "⌁", `下一鏟已標記：座標 ${x + 1} · ${y + 1}。目前演出結束後會立刻出發。`);
-    if (ui.log) ui.log.textContent = `下一鏟已標記在座標 ${x + 1} · ${y + 1}。`;
+    updateStage("queued", "⌁", `下一鏟已標記：${locationNameFor(x, y)}。目前成果完整顯現後會立刻出發。`);
+    if (ui.log) ui.log.textContent = `下一鏟已預約至${locationNameFor(x, y)}。`;
     renderSelection();
     return { ok: true, state, message: "下一鏟已標記。", event: null, queued: true };
   }
@@ -208,7 +222,7 @@ export function createExpeditionController({ root = document, townController, on
     renderer.setQueuedTile(queuedTile);
     renderSelection();
     updateStage("aim", "⌁", "鏟尖正在定位；這次翻開會先呈現完整的地層反應。");
-    if (ui.log) ui.log.textContent = `準備調查座標 ${x + 1} · ${y + 1}…`;
+    if (ui.log) ui.log.textContent = `挖礦者正前往${locationNameFor(x, y)}…`;
     await renderer.playExcavation({ x, y }, result.event);
 
     const townResult = townController.recordExpedition(state, { ...result.event, message: result.message });

@@ -4840,3 +4840,169 @@ body[data-view="town"] .collection-journal {
     animation: none;
   }
 }
+
+/* v0.8 — 遠征是可被行走的島嶼，不是包在面板裡的一張格盤。 */
+body[data-view="expedition"] {
+  overflow-x: clip;
+  background:
+    radial-gradient(circle at 82% 5%, rgba(248, 185, 112, 0.2), transparent 25rem),
+    radial-gradient(circle at 12% 33%, rgba(91, 202, 202, 0.16), transparent 30rem),
+    linear-gradient(180deg, #253b67 0%, #152850 39%, #0d1834 100%);
+}
+
+body[data-view="expedition"] .app-shell {
+  width: min(1540px, calc(100% - 1.25rem));
+  padding-top: 0.7rem;
+}
+
+body[data-view="expedition"] .game-header {
+  margin-bottom: 0.45rem;
+  background: rgba(10, 20, 42, 0.55);
+  border-color: rgba(235, 230, 197, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+body[data-view="expedition"] .world-nav {
+  margin-bottom: 0.65rem;
+  background: rgba(8, 19, 42, 0.38);
+  border-color: rgba(232, 236, 212, 0.12);
+}
+
+body[data-view="expedition"] .expedition-view {
+  gap: 0.75rem;
+}
+
+body[data-view="expedition"] .expedition-banner {
+  position: relative;
+  overflow: hidden;
+  min-height: 112px;
+  padding: clamp(1rem, 2.5vw, 1.35rem) clamp(1rem, 3.5vw, 2.2rem);
+  background:
+    radial-gradient(ellipse at 86% 20%, rgba(255, 205, 128, 0.25), transparent 24rem),
+    radial-gradient(ellipse at 65% 115%, rgba(90, 205, 188, 0.2), transparent 28rem),
+    linear-gradient(118deg, rgba(25, 50, 76, 0.97), rgba(26, 62, 91, 0.92));
+  border-color: rgba(255, 228, 159, 0.22);
+  box-shadow: 0 17px 36px rgba(1, 8, 28, 0.27);
+}
+
+body[data-view="expedition"] .expedition-banner::after {
+  position: absolute;
+  right: -4rem;
+  bottom: -6.5rem;
+  width: 20rem;
+  height: 15rem;
+  content: "";
+  pointer-events: none;
+  background: repeating-radial-gradient(ellipse at center, rgba(230, 249, 221, 0.12) 0 1px, transparent 2px 18px);
+  border-radius: 50%;
+  transform: rotate(-18deg);
+}
+
+body[data-view="expedition"] .expedition-banner > * {
+  position: relative;
+  z-index: 1;
+}
+
+body[data-view="expedition"] .expedition-banner h2 {
+  letter-spacing: 0.035em;
+}
+
+body[data-view="expedition"] .expedition-layout {
+  grid-template-columns: minmax(0, 1.78fr) minmax(275px, 0.65fr);
+  gap: 0.75rem;
+}
+
+body[data-view="expedition"] .expedition-map-card {
+  padding: 0.6rem;
+  overflow: hidden;
+  background: linear-gradient(155deg, rgba(18, 41, 71, 0.87), rgba(9, 22, 50, 0.94));
+  border-color: rgba(215, 235, 226, 0.22);
+  box-shadow: 0 22px 52px rgba(0, 9, 29, 0.36);
+}
+
+body[data-view="expedition"] .expedition-map-heading {
+  align-items: center;
+  min-height: 3.9rem;
+  padding: 0.18rem 0.45rem 0.42rem;
+  margin: 0;
+}
+
+body[data-view="expedition"] .expedition-map-heading h3 {
+  font-family: Georgia, "Noto Serif TC", serif;
+  font-size: clamp(1rem, 2vw, 1.32rem);
+}
+
+body[data-view="expedition"] #expedition-canvas {
+  height: clamp(440px, 66svh, 720px);
+  background: #172f59;
+  border: 1px solid rgba(228, 244, 233, 0.2);
+  border-radius: 21px;
+  box-shadow: inset 0 0 46px rgba(133, 211, 217, 0.1), 0 12px 30px rgba(0, 8, 27, 0.3);
+}
+
+body[data-view="expedition"] .expedition-stage {
+  margin: -4.7rem 0.5rem 0.5rem;
+  background: linear-gradient(100deg, rgba(8, 26, 51, 0.87), rgba(25, 59, 72, 0.8));
+  border-color: rgba(191, 238, 206, 0.26);
+  backdrop-filter: blur(9px);
+}
+
+body[data-view="expedition"] .expedition-map-help,
+body[data-view="expedition"] .expedition-log {
+  margin-right: 0.45rem;
+  margin-left: 0.45rem;
+}
+
+body[data-view="expedition"] .expedition-map-help {
+  color: #c8d7e7;
+}
+
+body[data-view="expedition"] .expedition-map-help strong {
+  color: #fff0b7;
+}
+
+body[data-view="expedition"] .expedition-log {
+  color: #fff2c3;
+  background: rgba(255, 221, 136, 0.1);
+}
+
+body[data-view="expedition"] .expedition-side-panel {
+  gap: 0.72rem;
+}
+
+body[data-view="expedition"] .expedition-side-panel > section {
+  border-color: rgba(225, 239, 221, 0.16);
+  box-shadow: 0 10px 25px rgba(2, 9, 27, 0.2);
+}
+
+body[data-view="expedition"] .compass-card {
+  background: radial-gradient(circle at 85% 10%, rgba(255, 225, 127, 0.18), transparent 11rem), linear-gradient(145deg, rgba(40, 62, 96, 0.96), rgba(17, 30, 60, 0.98));
+}
+
+@media (max-width: 900px) {
+  body[data-view="expedition"] .expedition-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  body[data-view="expedition"] .app-shell {
+    width: min(calc(100% - 0.75rem), 1540px);
+    padding-top: 0.38rem;
+  }
+
+  body[data-view="expedition"] .expedition-banner {
+    min-height: 0;
+  }
+
+  body[data-view="expedition"] #expedition-canvas {
+    height: clamp(390px, 62svh, 590px);
+    border-radius: 16px;
+  }
+
+  body[data-view="expedition"] .expedition-stage {
+    grid-template-columns: 1.9rem minmax(0, 1fr);
+    min-height: 3.7rem;
+    margin-top: -5.05rem;
+  }
+}
