@@ -9,7 +9,7 @@
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.9.0" />
+    <link rel="stylesheet" href="./styles.css?v=0.11.0" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.9.0</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.11.0</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -157,6 +157,10 @@
             </aside>
           </section>
 
+          <button id="town-collection-button" class="town-scene-tool" type="button" aria-haspopup="dialog" aria-controls="town-collection-journal" aria-expanded="false">
+            <span aria-hidden="true">📖</span><strong>星願手札</strong><small>永久收藏</small>
+          </button>
+
           <div class="town-dashboard">
             <section id="town-map" class="town-map" aria-labelledby="building-title">
               <div class="section-heading">
@@ -170,6 +174,8 @@
 
               <div id="town-building-grid" class="town-building-grid">
                 <article class="town-building garden-building" data-town-place="garden">
+                  <button class="town-place-hitbox" data-open-town-place="garden" type="button" aria-label="前往月芽藥園" aria-expanded="false"></button>
+                  <button class="town-panel-close" data-close-town-place type="button" aria-label="關閉月芽藥園">×</button>
                   <div class="building-icon" aria-hidden="true"><span>🌿</span></div>
                   <div class="building-heading">
                     <span class="building-kicker">每天一次 · 補給站</span>
@@ -186,6 +192,8 @@
                 </article>
 
                 <article class="town-building expedition-building" data-town-place="expedition">
+                  <button class="town-place-hitbox" data-open-town-place="expedition" type="button" aria-label="前往星脈遠征" aria-expanded="false"></button>
+                  <button class="town-panel-close" data-close-town-place type="button" aria-label="關閉星脈遠征">×</button>
                   <div class="building-icon" aria-hidden="true"><span>🧭</span></div>
                   <div class="building-heading">
                     <span class="building-kicker">主要冒險 · 每格有收穫</span>
@@ -201,6 +209,8 @@
                 </article>
 
                 <article class="town-building clinic-building" data-town-place="clinic">
+                  <button class="town-place-hitbox" data-open-town-place="clinic" type="button" aria-label="前往暖星小遊戲屋" aria-expanded="false"></button>
+                  <button class="town-panel-close" data-close-town-place type="button" aria-label="關閉暖星小遊戲屋">×</button>
                   <div class="building-icon" aria-hidden="true"><span>🃏</span></div>
                   <div class="building-heading">
                     <span class="building-kicker">換個節奏 · 配對小遊戲</span>
@@ -217,6 +227,8 @@
                 </article>
 
                 <article class="town-building workshop-building" data-town-place="workshop">
+                  <button class="town-place-hitbox" data-open-town-place="workshop" type="button" aria-label="前往回響工坊" aria-expanded="false"></button>
+                  <button class="town-panel-close" data-close-town-place type="button" aria-label="關閉回響工坊">×</button>
                   <div class="building-icon" aria-hidden="true"><span>🔨</span></div>
                   <div class="building-heading">
                     <span class="building-kicker">選做 · 換建設材料</span>
@@ -233,7 +245,8 @@
                 </article>
 
                 <article class="town-building plaza-building" data-town-place="plaza">
-                  <div class="building-icon" aria-hidden="true"><span>🏮</span></div>
+                  <button class="town-place-hitbox" data-open-town-place="plaza" type="button" aria-label="打開星願廣場" aria-expanded="false"></button>
+                  <div class="building-icon" aria-hidden="true"><span>✦</span></div>
                   <div class="building-heading">
                     <span class="building-kicker">終點會一直留下來</span>
                     <strong>星願廣場</strong>
@@ -248,11 +261,12 @@
               </div>
             </section>
 
-            <aside class="wish-journal" aria-labelledby="wish-title">
+            <aside id="town-wish-journal" class="wish-journal" role="dialog" aria-modal="true" aria-labelledby="wish-title" aria-hidden="true">
+              <button id="close-town-wishes" class="town-panel-close" type="button" aria-label="關閉星願廣場">×</button>
               <div class="wish-heading">
                 <div>
-                  <p class="eyebrow">今天能做的事</p>
-                  <h2 id="wish-title">今日星願</h2>
+                  <p class="eyebrow">今天能做的事 · 暖燈坡中央</p>
+                  <h2 id="wish-title">星願廣場</h2>
                 </div>
                 <strong id="town-wish-count">0 / 3</strong>
               </div>
@@ -267,7 +281,8 @@
             </aside>
           </div>
 
-          <section class="collection-journal" aria-labelledby="collection-title">
+          <section id="town-collection-journal" class="collection-journal" role="dialog" aria-modal="true" aria-labelledby="collection-title" aria-hidden="true">
+            <button id="close-town-collection" class="town-panel-close" type="button" aria-label="關閉星願手札">×</button>
             <div class="collection-heading">
               <div>
                 <p class="eyebrow">永久收藏</p>
@@ -535,6 +550,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.9.0"></script>
+    <script type="module" src="./src/app.js?v=0.11.0"></script>
   </body>
 </html>

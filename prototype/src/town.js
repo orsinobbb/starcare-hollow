@@ -661,12 +661,59 @@ export function createTownController({ root = document, storage = globalThis.loc
     nextDay: element("#next-town-day"),
     gardenAction: element("#garden-action"),
     commissionAction: element("#commission-action"),
+    townView: element("#town-view"),
     buildingGrid: element("#town-building-grid"),
+    wishJournal: element("#town-wish-journal"),
+    closeWishes: element("#close-town-wishes"),
+    collectionJournal: element("#town-collection-journal"),
+    collectionButton: element("#town-collection-button"),
+    closeCollection: element("#close-town-collection"),
     collectionGrid: element("#town-collection-grid"),
     collectionCount: element("#town-collection-count"),
     saveStatus: element("#save-status"),
     lifetime: element("#town-lifetime")
   };
+  let townPanelOpener = null;
+
+  function closeTownPanels({ restoreFocus = false } = {}) {
+    for (const building of root.querySelectorAll("[data-town-place]")) building.classList.remove("is-open");
+    for (const trigger of root.querySelectorAll("[data-open-town-place]")) trigger.setAttribute("aria-expanded", "false");
+    for (const panel of [ui.wishJournal, ui.collectionJournal]) {
+      panel?.classList.remove("is-open");
+      panel?.setAttribute("aria-hidden", "true");
+    }
+    ui.collectionButton?.setAttribute("aria-expanded", "false");
+    ui.townView?.classList.remove("has-dialog");
+    if (restoreFocus) townPanelOpener?.focus();
+    townPanelOpener = null;
+  }
+
+  function openTownPlace(placeId, opener) {
+    closeTownPanels();
+    townPanelOpener = opener ?? null;
+    ui.townView?.classList.add("has-dialog");
+    if (placeId === "plaza") {
+      ui.wishJournal?.classList.add("is-open");
+      ui.wishJournal?.setAttribute("aria-hidden", "false");
+      opener?.setAttribute("aria-expanded", "true");
+      ui.closeWishes?.focus();
+      return;
+    }
+    const building = root.querySelector(`[data-town-place="${placeId}"]`);
+    building?.classList.add("is-open");
+    opener?.setAttribute("aria-expanded", "true");
+    building?.querySelector("[data-close-town-place]")?.focus();
+  }
+
+  function openCollection(opener) {
+    closeTownPanels();
+    townPanelOpener = opener ?? null;
+    ui.townView?.classList.add("has-dialog");
+    ui.collectionJournal?.classList.add("is-open");
+    ui.collectionJournal?.setAttribute("aria-hidden", "false");
+    opener?.setAttribute("aria-expanded", "true");
+    ui.closeCollection?.focus();
+  }
 
   function persist() {
     state.updatedAt = new Date().toISOString();
@@ -825,8 +872,23 @@ export function createTownController({ root = document, storage = globalThis.loc
   ui.claimReward?.addEventListener("click", () => commit(claimDailyReward(state)));
   ui.nextDay?.addEventListener("click", () => commit(advanceTownDay(state)));
   ui.buildingGrid?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-upgrade-building]");
-    if (button) commit(upgradeBuilding(state, button.dataset.upgradeBuilding));
+    const placeButton = event.target.closest("[data-open-town-place]");
+    if (placeButton) {
+      openTownPlace(placeButton.dataset.openTownPlace, placeButton);
+      return;
+    }
+    if (event.target.closest("[data-close-town-place]")) {
+      closeTownPanels({ restoreFocus: true });
+      return;
+    }
+    const upgradeButton = event.target.closest("[data-upgrade-building]");
+    if (upgradeButton) commit(upgradeBuilding(state, upgradeButton.dataset.upgradeBuilding));
+  });
+  ui.closeWishes?.addEventListener("click", () => closeTownPanels({ restoreFocus: true }));
+  ui.collectionButton?.addEventListener("click", () => openCollection(ui.collectionButton));
+  ui.closeCollection?.addEventListener("click", () => closeTownPanels({ restoreFocus: true }));
+  root.addEventListener?.("keydown", (event) => {
+    if (event.key === "Escape" && ui.townView?.classList.contains("has-dialog")) closeTownPanels({ restoreFocus: true });
   });
 
   render();
