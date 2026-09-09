@@ -3,6 +3,8 @@ import { EXPEDITION_HEIGHT, EXPEDITION_WIDTH, isInBounds, isRevealed, targetAt, 
 const MAX_PARTICLES = 40;
 const TAP_DISTANCE_PX = 8;
 const FIXED_STEP_SECONDS = 1 / 60;
+const DIG_BEACON_HIT_RADIUS = 0.38;
+const WALKABLE_RADIUS = 0.82;
 const EXCAVATION_TIMELINE = {
   walk: 0.42,
   aim: 0.22,
@@ -39,12 +41,13 @@ function drawRoundedRect(context, x, y, width, height, radius) {
 }
 
 export class ExpeditionRenderer {
-  constructor(canvas, { onExcavate = () => {}, onFocusTile = () => {}, onStage = () => {} } = {}) {
+  constructor(canvas, { onExcavate = () => {}, onFocusTile = () => {}, onStage = () => {}, onMove = () => {} } = {}) {
     this.canvas = canvas;
     this.context = canvas.getContext("2d", { alpha: false });
     this.onExcavate = onExcavate;
     this.onFocusTile = onFocusTile;
     this.onStage = onStage;
+    this.onMove = onMove;
     this.state = null;
     this.width = 1;
     this.height = 1;
@@ -57,6 +60,11 @@ export class ExpeditionRenderer {
     this.particles = [];
     this.excavation = null;
     this.minerTile = { x: 0, y: 0 };
+    this.movement = null;
+    this.pendingMove = null;
+    this.minerFacing = 1;
+    this.lastFootstep = 0;
+    this.reaction = null;
     this.queuedTile = null;
     this.shake = { x: 0, y: 0, energy: 0 };
     this.running = false;
@@ -182,6 +190,11 @@ export class ExpeditionRenderer {
       particle.vy += 0.46 * delta;
     }
     this.particles = this.particles.filter((particle) => particle.life > 0);
+    if (this.reaction) {
+      this.reaction.elapsed += delta;
+      if (this.reaction.elapsed >= this.reaction.duration) this.reaction = null;
+    }
+    this.updateMovement(delta);
     this.updateExcavation(delta);
     this.updateShake(delta);
   }
@@ -269,6 +282,22 @@ export class ExpeditionRenderer {
     }
   }
 
+  updateMovement(delta) {
+    if (!this.movement || this.excavation) return;
+    const movement = this.movement;
+    movement.elapsed += delta;
+    const progress = clamp(movement.elapsed / movement.duration, 0, 1);
+    const position = this.currentMinerPosition();
+    if (!this.reducedMotion && movement.elapsed - this.lastFootstep >= 0.18 && progress < 0.94) {
+      this.lastFootstep = movement.elapsed;
+      this.spawnBurst(position, terrainAt(this.state, Math.round(position.x), Math.round(position.y)), 2, "dust");
+    }
+    if (progress < 1) return;
+    this.minerTile = { ...movement.destination };
+    this.movement = null;
+    this.onMove({ stage: "arrive", destination: { ...this.minerTile } });
+  }
+
   finishExcavation() {
     const animation = this.excavation;
     if (!animation) return;
@@ -276,7 +305,12 @@ export class ExpeditionRenderer {
     this.minerTile = { ...animation.tile };
     this.excavation = null;
     this.shake = { x: 0, y: 0, energy: 0 };
+    const destination = this.pendingMove;
+    this.pendingMove = null;
     animation.resolve?.();
+    if (destination) queueMicrotask(() => {
+      if (!this.excavation && !this.movement) this.startMovement(destination);
+    });
   }
 
   spawnBurst(tile, terrain, count, shape) {
@@ -342,6 +376,107 @@ export class ExpeditionRenderer {
     return closest.distance <= this.tileSize * 0.68 ? closest : { x: -1, y: -1 };
   }
 
+  screenToWorld(clientX, clientY) {
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      x: this.camera.x + (clientX - rect.left - this.width / 2) / this.tileSize,
+      y: this.camera.y + (clientY - rect.top - this.height / 2) / this.tileSize
+    };
+  }
+
+  nearestTile(clientX, clientY) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    let closest = { x: -1, y: -1, distance: Infinity };
+    for (let tileY = 0; tileY < this.state.height; tileY += 1) {
+      for (let tileX = 0; tileX < this.state.width; tileX += 1) {
+        const screen = this.tileToScreen(tileX, tileY);
+        const distance = Math.hypot(screen.x - x, screen.y - y);
+        if (distance < closest.distance) closest = { x: tileX, y: tileY, distance };
+      }
+    }
+    return closest;
+  }
+
+  walkableDestination(world) {
+    const bounded = {
+      x: clamp(world.x, 0, this.state.width - 1),
+      y: clamp(world.y, 0, this.state.height - 1)
+    };
+    let nearest = null;
+    for (let y = 0; y < this.state.height; y += 1) {
+      for (let x = 0; x < this.state.width; x += 1) {
+        if (!isRevealed(this.state, x, y)) continue;
+        const distance = Math.hypot(bounded.x - x, bounded.y - y);
+        if (!nearest || distance < nearest.distance) nearest = { x, y, distance };
+      }
+    }
+    if (!nearest) return { x: 0, y: 0 };
+    if (nearest.distance <= WALKABLE_RADIUS) return bounded;
+    return { x: nearest.x, y: nearest.y };
+  }
+
+  currentMinerPosition() {
+    if (this.excavation) {
+      const { origin, tile, elapsed, timeline } = this.excavation;
+      const travel = clamp(elapsed / Math.max(0.001, timeline.walk), 0, 1);
+      const progress = travel * travel * (3 - 2 * travel);
+      return {
+        x: origin.x + (tile.x - origin.x) * progress,
+        y: origin.y + (tile.y - origin.y) * progress
+      };
+    }
+    if (this.movement) {
+      const progress = clamp(this.movement.elapsed / this.movement.duration, 0, 1);
+      const easedProgress = progress * progress * (3 - 2 * progress);
+      return {
+        x: this.movement.origin.x + (this.movement.destination.x - this.movement.origin.x) * easedProgress,
+        y: this.movement.origin.y + (this.movement.destination.y - this.movement.origin.y) * easedProgress
+      };
+    }
+    return { ...this.minerTile };
+  }
+
+  startMovement(destination) {
+    const origin = this.currentMinerPosition();
+    const distance = Math.hypot(destination.x - origin.x, destination.y - origin.y);
+    if (distance < 0.06) {
+      this.minerTile = { ...destination };
+      return;
+    }
+    if (Math.abs(destination.x - origin.x) > 0.04) this.minerFacing = destination.x >= origin.x ? 1 : -1;
+    this.movement = {
+      origin,
+      destination: { ...destination },
+      elapsed: 0,
+      duration: this.reducedMotion ? 0.16 : clamp(distance * 0.19, 0.24, 1.25)
+    };
+    this.reaction = null;
+    this.lastFootstep = -0.18;
+    this.onMove({ stage: "walk", destination: { ...destination } });
+  }
+
+  requestMovement(destination) {
+    const walkable = this.walkableDestination(destination);
+    if (this.excavation) {
+      this.pendingMove = walkable;
+      this.onMove({ stage: "queued", destination: { ...walkable } });
+      return;
+    }
+    this.pendingMove = null;
+    this.startMovement(walkable);
+  }
+
+  playReaction(type = "blocked") {
+    if (this.excavation) return;
+    this.reaction = {
+      type: type === "focus" ? "tired" : "blocked",
+      elapsed: 0,
+      duration: this.reducedMotion ? 0.35 : 0.8
+    };
+  }
+
   tileToScreen(x, y) {
     const drift = this.visualDrift(x, y);
     return {
@@ -403,9 +538,17 @@ export class ExpeditionRenderer {
     if (!this.pointer || event.pointerId !== this.pointer.id) return;
     const wasTap = !this.pointer.moved;
     if (wasTap) {
-      const tile = this.screenToTile(event.clientX, event.clientY);
-      this.setKeyboardTile(tile.x, tile.y);
-      if (isInBounds(this.state, tile.x, tile.y)) this.onExcavate(tile);
+      const tile = this.nearestTile(event.clientX, event.clientY);
+      const isDigIntent = isInBounds(this.state, tile.x, tile.y)
+        && !isRevealed(this.state, tile.x, tile.y)
+        && this.isSelectable(tile.x, tile.y)
+        && tile.distance <= this.tileSize * DIG_BEACON_HIT_RADIUS;
+      if (isDigIntent) {
+        this.setKeyboardTile(tile.x, tile.y);
+        this.onExcavate(tile);
+      } else {
+        this.requestMovement(this.screenToWorld(event.clientX, event.clientY));
+      }
     }
     this.releasePointer(event);
     event.preventDefault();
@@ -452,11 +595,15 @@ export class ExpeditionRenderer {
 
   playExcavation(tile, event) {
     if (this.excavation) return Promise.resolve();
+    const origin = this.currentMinerPosition();
+    this.movement = null;
+    this.pendingMove = null;
+    if (Math.abs(tile.x - origin.x) > 0.04) this.minerFacing = tile.x >= origin.x ? 1 : -1;
     const timeline = this.timelineFor(event);
     return new Promise((resolve) => {
       this.excavation = {
         tile,
-        origin: { ...this.minerTile },
+        origin,
         event,
         timeline,
         elapsed: 0,
@@ -545,6 +692,7 @@ export class ExpeditionRenderer {
         this.drawTile(context, x, y, left, top, this.tileSize, revealed, selectable);
       }
     }
+    this.drawMovementTarget(context);
     this.drawMiner(context);
     this.drawRewardPopup(context);
     context.restore();
@@ -1086,61 +1234,227 @@ export class ExpeditionRenderer {
     context.restore();
   }
 
+  drawMovementTarget(context) {
+    const destination = this.pendingMove ?? this.movement?.destination;
+    if (!destination) return;
+    const screen = this.tileToScreen(destination.x, destination.y);
+    const pulse = 0.72 + Math.sin(performance.now() / 170) * 0.16;
+    context.save();
+    context.globalAlpha = pulse;
+    context.strokeStyle = "#d8f3d4";
+    context.lineWidth = Math.max(1.6, this.tileSize * 0.026);
+    context.setLineDash([this.tileSize * 0.07, this.tileSize * 0.055]);
+    context.beginPath();
+    context.ellipse(screen.x, screen.y + this.tileSize * 0.18, this.tileSize * 0.22, this.tileSize * 0.09, 0, 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+    context.fillStyle = "rgba(216, 243, 212, 0.86)";
+    context.beginPath();
+    context.arc(screen.x, screen.y + this.tileSize * 0.18, this.tileSize * 0.035, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+
   drawMiner(context) {
     const animation = this.excavation;
-    let tile = this.minerTile;
-    let working = false;
-    if (animation) {
-      const travel = clamp(animation.elapsed / Math.max(0.001, animation.timeline.walk), 0, 1);
-      const progress = travel * travel * (3 - 2 * travel);
-      tile = {
-        x: animation.origin.x + (animation.tile.x - animation.origin.x) * progress,
-        y: animation.origin.y + (animation.tile.y - animation.origin.y) * progress
-      };
-      working = travel >= 1 && animation.stage !== "reward" && animation.stage !== "settle";
+    const tile = this.currentMinerPosition();
+    let action = this.movement ? "walk" : "idle";
+    let actionProgress = this.movement ? this.movement.elapsed / Math.max(0.001, this.movement.duration) : 0;
+    if (!this.movement && this.reaction) {
+      action = this.reaction.type;
+      actionProgress = this.reaction.elapsed / Math.max(0.001, this.reaction.duration);
     }
+    if (animation) {
+      const { elapsed, timeline } = animation;
+      const aimAt = timeline.walk;
+      const impactAt = aimAt + timeline.aim;
+      const revealAt = impactAt + timeline.impact;
+      const discoveryAt = revealAt + timeline.reveal;
+      const rewardAt = discoveryAt + timeline.discovery;
+      if (elapsed < aimAt) [action, actionProgress] = ["walk", elapsed / Math.max(0.001, timeline.walk)];
+      else if (elapsed < impactAt) [action, actionProgress] = ["aim", (elapsed - aimAt) / Math.max(0.001, timeline.aim)];
+      else if (elapsed < revealAt) [action, actionProgress] = ["impact", (elapsed - impactAt) / Math.max(0.001, timeline.impact)];
+      else if (elapsed < discoveryAt) [action, actionProgress] = ["brush", (elapsed - revealAt) / Math.max(0.001, timeline.reveal)];
+      else if (animation.event.type === "discovery" && elapsed < rewardAt) [action, actionProgress] = ["celebrate", (elapsed - discoveryAt) / Math.max(0.001, timeline.discovery)];
+      else if (elapsed < rewardAt + timeline.reward) [action, actionProgress] = ["present", (elapsed - rewardAt) / Math.max(0.001, timeline.reward)];
+      else [action, actionProgress] = ["settle", (elapsed - rewardAt - timeline.reward) / Math.max(0.001, timeline.settle)];
+    }
+
+    const now = performance.now();
     const screen = this.tileToScreen(tile.x, tile.y);
-    const size = this.tileSize * 0.42;
-    const bob = working ? Math.sin(performance.now() / 76) * size * 0.035 : Math.sin(performance.now() / 300) * size * 0.02;
+    const size = this.tileSize * 0.64;
+    const walkCycle = (this.movement?.elapsed ?? animation?.elapsed ?? 0) * 11;
+    const stride = action === "walk" ? Math.sin(walkCycle) : 0;
+    const breathe = Math.sin(now / 430) * size * 0.012;
+    const blink = action === "tired" || now % 4300 > 4100;
+    const jump = action === "celebrate" ? Math.sin(clamp(actionProgress, 0, 1) * Math.PI) * size * 0.16 : 0;
+    const crouch = action === "brush" ? size * (0.08 + Math.sin(actionProgress * Math.PI) * 0.08) : 0;
+    const bob = action === "walk" ? -Math.abs(stride) * size * 0.045 : breathe;
+    const toolAngle = action === "aim"
+      ? -0.85 - actionProgress * 0.5
+      : action === "impact"
+        ? -1.35 + actionProgress * 2.05
+        : action === "brush"
+          ? 0.76 + Math.sin(actionProgress * Math.PI * 4) * 0.14
+          : 0.34;
+    const presenting = action === "present" || action === "celebrate";
+    const armSwing = action === "walk" ? -stride * 0.34 : 0;
+    const reactionX = action === "blocked" ? Math.sin(actionProgress * Math.PI * 7) * size * 0.045 : 0;
+    const tiredDrop = action === "tired" ? Math.sin(clamp(actionProgress, 0, 1) * Math.PI) * size * 0.08 : 0;
+
     context.save();
-    context.translate(screen.x, screen.y + size * 0.12 + bob);
+    context.translate(screen.x + reactionX, screen.y + size * 0.3 + bob + crouch - jump + tiredDrop);
+    context.scale(this.minerFacing, 1);
     context.shadowColor = "rgba(4, 12, 30, 0.5)";
-    context.shadowBlur = size * 0.18;
-    context.shadowOffsetY = size * 0.08;
+    context.shadowBlur = size * 0.14;
+    context.shadowOffsetY = size * 0.06;
     context.fillStyle = "rgba(8, 18, 40, 0.48)";
     context.beginPath();
-    context.ellipse(0, size * 0.35, size * 0.33, size * 0.11, 0, 0, Math.PI * 2);
+    context.ellipse(0, size * 0.08 + jump, size * 0.3, size * 0.085, 0, 0, Math.PI * 2);
     context.fill();
     context.shadowBlur = 0;
-    context.fillStyle = "#5d9b90";
-    drawRoundedRect(context, -size * 0.22, -size * 0.03, size * 0.44, size * 0.39, size * 0.12);
+
+    const limb = (fromX, fromY, toX, toY, width, color) => {
+      context.strokeStyle = color;
+      context.lineWidth = width;
+      context.lineCap = "round";
+      context.beginPath();
+      context.moveTo(fromX, fromY);
+      context.lineTo(toX, toY);
+      context.stroke();
+    };
+
+    const legLift = stride * size * 0.07;
+    limb(-size * 0.1, -size * 0.13, -size * 0.13 - legLift, size * 0.03, size * 0.115, "#f3e7cf");
+    limb(size * 0.1, -size * 0.13, size * 0.13 + legLift, size * 0.03, size * 0.115, "#f3e7cf");
+    limb(-size * 0.14 - legLift, size * 0.03, -size * 0.2 - legLift, size * 0.055, size * 0.105, "#694d3e");
+    limb(size * 0.14 + legLift, size * 0.03, size * 0.2 + legLift, size * 0.055, size * 0.105, "#694d3e");
+
+    context.fillStyle = "#287f80";
+    drawRoundedRect(context, -size * 0.32, -size * 0.45, size * 0.2, size * 0.29, size * 0.065);
     context.fill();
-    context.strokeStyle = "#d8f3d4";
-    context.lineWidth = Math.max(1, size * 0.035);
+    context.strokeStyle = "#d3efca";
+    context.lineWidth = Math.max(1, size * 0.028);
     context.stroke();
-    context.fillStyle = "#ffe1bb";
-    context.beginPath();
-    context.arc(0, -size * 0.2, size * 0.2, 0, Math.PI * 2);
+
+    context.fillStyle = "#d8783f";
+    drawRoundedRect(context, -size * 0.235, -size * 0.48, size * 0.47, size * 0.4, size * 0.13);
     context.fill();
-    context.fillStyle = "#f2bc48";
+    context.strokeStyle = "#6d4939";
+    context.lineWidth = Math.max(1.2, size * 0.03);
+    context.stroke();
+    context.fillStyle = "#f7bd5e";
     context.beginPath();
-    context.arc(0, -size * 0.28, size * 0.23, Math.PI, 0);
-    context.lineTo(size * 0.2, -size * 0.16);
-    context.lineTo(-size * 0.2, -size * 0.16);
+    context.moveTo(-size * 0.19, -size * 0.45);
+    context.lineTo(0, -size * 0.31);
+    context.lineTo(size * 0.19, -size * 0.45);
+    context.lineTo(size * 0.12, -size * 0.51);
+    context.lineTo(0, -size * 0.4);
+    context.lineTo(-size * 0.12, -size * 0.51);
     context.closePath();
     context.fill();
-    context.strokeStyle = "#88583d";
-    context.lineWidth = Math.max(1.3, size * 0.065);
-    context.lineCap = "round";
+
+    const frontHand = presenting
+      ? { x: size * 0.2, y: -size * 0.58 }
+      : { x: size * (0.25 + Math.cos(toolAngle) * 0.12), y: -size * (0.29 + Math.sin(toolAngle) * 0.14) };
+    const backHand = presenting
+      ? { x: -size * 0.2, y: -size * 0.58 }
+      : { x: -size * (0.25 + armSwing), y: -size * (0.28 - Math.abs(armSwing) * 0.22) };
+    limb(-size * 0.16, -size * 0.4, backHand.x, backHand.y, size * 0.105, "#d8783f");
+    limb(size * 0.16, -size * 0.4, frontHand.x, frontHand.y, size * 0.105, "#d8783f");
+    context.fillStyle = "#ffdabb";
+    for (const hand of [backHand, frontHand]) {
+      context.beginPath();
+      context.arc(hand.x, hand.y, size * 0.061, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.fillStyle = "#ffe1bb";
     context.beginPath();
-    const swing = working ? Math.sin(performance.now() / 74) * size * 0.12 : 0;
-    context.moveTo(size * 0.1, -size * 0.03);
-    context.lineTo(size * 0.42, -size * 0.32 + swing);
-    context.stroke();
-    context.fillStyle = "#c8e0ea";
-    context.beginPath();
-    context.arc(size * 0.43, -size * 0.33 + swing, size * 0.08, 0, Math.PI * 2);
+    context.arc(0, -size * 0.65, size * 0.235, 0, Math.PI * 2);
     context.fill();
+    context.fillStyle = "#604136";
+    context.beginPath();
+    context.arc(0, -size * 0.69, size * 0.255, Math.PI * 0.92, Math.PI * 2.08);
+    context.lineTo(size * 0.2, -size * 0.62);
+    context.quadraticCurveTo(size * 0.11, -size * 0.56, size * 0.08, -size * 0.78);
+    context.quadraticCurveTo(-size * 0.02, -size * 0.59, -size * 0.09, -size * 0.79);
+    context.quadraticCurveTo(-size * 0.14, -size * 0.58, -size * 0.22, -size * 0.62);
+    context.closePath();
+    context.fill();
+
+    context.strokeStyle = "#433449";
+    context.fillStyle = "#433449";
+    context.lineWidth = Math.max(1.4, size * 0.03);
+    if (blink) {
+      context.beginPath();
+      context.moveTo(-size * 0.09, -size * 0.66);
+      context.lineTo(-size * 0.035, -size * 0.66);
+      context.moveTo(size * 0.055, -size * 0.66);
+      context.lineTo(size * 0.11, -size * 0.66);
+      context.stroke();
+    } else {
+      context.beginPath();
+      context.arc(-size * 0.06, -size * 0.66, size * 0.032, 0, Math.PI * 2);
+      context.arc(size * 0.09, -size * 0.66, size * 0.032, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.strokeStyle = "#a24f4c";
+    context.lineWidth = Math.max(1, size * 0.018);
+    context.beginPath();
+    if (action === "tired") {
+      context.arc(size * 0.025, -size * 0.545, size * 0.045, 1.08 * Math.PI, 1.92 * Math.PI);
+    } else {
+      context.arc(size * 0.025, -size * 0.59, size * 0.045, 0.08 * Math.PI, 0.92 * Math.PI);
+    }
+    context.stroke();
+
+    context.fillStyle = "#f8cf54";
+    const starX = -size * 0.19;
+    const starY = -size * 0.78;
+    context.beginPath();
+    for (let point = 0; point < 10; point += 1) {
+      const radius = point % 2 === 0 ? size * 0.06 : size * 0.026;
+      const angle = -Math.PI / 2 + point * Math.PI / 5;
+      const x = starX + Math.cos(angle) * radius;
+      const y = starY + Math.sin(angle) * radius;
+      if (point === 0) context.moveTo(x, y); else context.lineTo(x, y);
+    }
+    context.closePath();
+    context.fill();
+
+    if (presenting) {
+      const glowY = -size * 0.6;
+      const glow = context.createRadialGradient(0, glowY, 0, 0, glowY, size * 0.24);
+      glow.addColorStop(0, "rgba(255, 244, 155, 0.96)");
+      glow.addColorStop(1, "rgba(255, 218, 91, 0)");
+      context.fillStyle = glow;
+      context.beginPath();
+      context.arc(0, glowY, size * 0.24, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = "#fff5a8";
+      context.beginPath();
+      context.arc(0, glowY, size * 0.065, 0, Math.PI * 2);
+      context.fill();
+    } else {
+      context.save();
+      context.translate(frontHand.x, frontHand.y);
+      context.rotate(toolAngle);
+      context.strokeStyle = "#7a513b";
+      context.lineWidth = Math.max(2, size * 0.045);
+      context.lineCap = "round";
+      context.beginPath();
+      context.moveTo(0, 0);
+      context.lineTo(size * 0.5, 0);
+      context.stroke();
+      context.strokeStyle = "#c6d8dc";
+      context.lineWidth = Math.max(3, size * 0.075);
+      context.beginPath();
+      context.moveTo(size * 0.42, -size * 0.12);
+      context.quadraticCurveTo(size * 0.54, 0, size * 0.42, size * 0.12);
+      context.stroke();
+      context.restore();
+    }
     context.restore();
   }
 

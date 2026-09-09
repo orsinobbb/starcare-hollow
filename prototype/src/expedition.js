@@ -67,6 +67,15 @@ export function createExpeditionController({ root = document, townController, on
       selectedTile = tile;
       renderSelection();
     },
+    onMove: ({ stage }) => {
+      const copy = {
+        walk: ["♟", "她正走向你指定的位置；途中仍可改目的地，或點亮起的星標開始挖掘。"],
+        queued: ["◎", "移動位置已記住；這一鏟的成果完整顯現後，她就會出發。"],
+        arrive: ["✦", "已到達指定位置。點空地可繼續走，點亮起的星標可開始挖掘。"]
+      };
+      const [icon, text] = copy[stage] ?? ["♟", "挖礦者正在移動。"];
+      updateStage(stage, icon, text);
+    },
     onStage: ({ stage, event }) => {
       const stageCopy = {
         walk: ["♟", "挖礦者正走向標記地點。"],
@@ -227,7 +236,7 @@ export function createExpeditionController({ root = document, townController, on
     if (ui.clueTitle) ui.clueTitle.textContent = state.lastClue.title;
     if (ui.clueDetail) ui.clueDetail.textContent = state.lastClue.detail;
     if (ui.compass) ui.compass.dataset.clue = state.lastClue.level;
-    canvas.setAttribute("aria-label", `穹星礦場踏查地圖。已踏查 ${explored} 處，找到 ${found} / ${state.targets.length} 件主要遺物。使用方向鍵選擇礦點，Enter 踏查。`);
+    canvas.setAttribute("aria-label", `穹星礦場踏查地圖。已踏查 ${explored} 處，找到 ${found} / ${state.targets.length} 件主要遺物。輕觸空地可移動；輕觸亮起星標可挖掘。使用方向鍵選擇礦點，Enter 踏查。`);
     renderer.setState(state);
     renderSelection();
     renderSupply(recovery);
@@ -253,6 +262,7 @@ export function createExpeditionController({ root = document, townController, on
     synchronizePassiveFocus();
     const permission = canExcavate(state, x, y);
     if (!permission.ok) {
+      renderer.playReaction(permission.reason);
       const message = permission.reason === "focus"
         ? `${permission.message} ${countdownText(recoverExpeditionFocus(state).remainingMs)} 後自然回復 +1。`
         : permission.message;
@@ -272,6 +282,7 @@ export function createExpeditionController({ root = document, townController, on
   async function beginExcavation(x, y) {
     const result = excavate(state, x, y);
     if (!result.ok) {
+      renderer.playReaction(result.reason);
       if (ui.log) ui.log.textContent = result.message;
       onNotify(result.message);
       renderSelection();

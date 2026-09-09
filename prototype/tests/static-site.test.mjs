@@ -134,6 +134,10 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(renderer, /playExcavation/);
   assert.match(renderer, /setQueuedTile/);
   assert.match(renderer, /drawMiner/);
+  assert.match(renderer, /requestMovement/);
+  assert.match(renderer, /drawMovementTarget/);
+  assert.match(renderer, /playReaction/);
+  assert.match(renderer, /this\.isSelectable\(tile\.x, tile\.y\)/);
   assert.match(renderer, /drawRewardPopup/);
   assert.match(renderer, /drawSpade/);
   assert.match(renderer, /drawExcavationOverlay/);
@@ -143,6 +147,8 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(controller, /isAnimating/);
   assert.match(controller, /queueExcavation/);
   assert.match(controller, /requestExcavate/);
+  assert.match(controller, /onMove/);
+  assert.match(controller, /輕觸空地可移動/);
   assert.match(controller, /下一鏟/);
   assert.match(controller, /await renderer\.playExcavation/);
   assert.match(controller, /resupplyExpeditionFocus/);
