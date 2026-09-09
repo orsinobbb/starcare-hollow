@@ -3,11 +3,13 @@ import test from "node:test";
 
 import {
   EXPEDITION_FOCUS_MAX,
+  EXPEDITION_FOCUS_REGEN_INTERVAL_MS,
   canExcavate,
   compassClue,
   createExpeditionState,
   excavate,
   normalizeExpeditionState,
+  recoverExpeditionFocus,
   regionAt,
   tileKey
 } from "../src/expedition-engine.js";
@@ -49,6 +51,22 @@ test("excavation is adjacency-gated and pays terrain focus only after a legal mo
   assert.equal(result.state.focus, EXPEDITION_FOCUS_MAX - permitted.terrain.cost);
   assert.equal(state.revealed.includes("1,0"), false, "the input state remains immutable");
   assert.deepEqual(result.event.reward, { coins: 4 }, "every ordinary grid gives a visible terrain reward");
+});
+
+test("focus recovers by real elapsed time, including time spent away from the island", () => {
+  const state = createExpeditionState("rest-test", 1_000);
+  state.focus = 26;
+  state.focusUpdatedAt = 1_000;
+
+  const beforeFirstPoint = recoverExpeditionFocus(state, 1_000 + EXPEDITION_FOCUS_REGEN_INTERVAL_MS - 1);
+  assert.equal(beforeFirstPoint.recovered, 0);
+  assert.equal(beforeFirstPoint.remainingMs, 1);
+
+  const returned = recoverExpeditionFocus(state, 1_000 + EXPEDITION_FOCUS_REGEN_INTERVAL_MS * 3 + 500);
+  assert.equal(returned.recovered, 3);
+  assert.equal(returned.state.focus, 29);
+  assert.equal(returned.remainingMs, EXPEDITION_FOCUS_REGEN_INTERVAL_MS - 500);
+  assert.equal(state.focus, 26, "passive recovery never mutates the saved snapshot in place");
 });
 
 test("terrain rewards make every grid materially useful and relic rewards are extra", () => {
@@ -113,7 +131,7 @@ test("a v1 save retains earned progress while adopting the coherent island geogr
 
   const migrated = normalizeExpeditionState(legacy);
 
-  assert.equal(migrated.schemaVersion, 2);
+  assert.equal(migrated.schemaVersion, 3);
   assert.equal(migrated.focus, 12);
   assert.equal(migrated.digs, 5);
   assert.deepEqual(migrated.revealed, ["0,0", "1,0", "1,1"]);

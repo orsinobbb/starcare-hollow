@@ -401,7 +401,10 @@ export function resupplyExpeditionFocus(state) {
   next.resources.moonleaf -= EXPEDITION_FOCUS_MOONLEAF_COST;
   next.expedition = normalizeExpeditionState({
     ...next.expedition,
-    focus: focus + restored
+    focus: focus + restored,
+    // A tea refill begins a fresh natural-recovery interval; otherwise an old
+    // timestamp could immediately add an unintended extra point.
+    focusUpdatedAt: Date.now()
   });
   const commissionDeferred = !state.daily.commission && next.resources.moonleaf < COMMISSION_MOONLEAF_COST;
   return collectionOutcome(state, next, `月芽暖茶回到羅盤：遠征專注 +${restored}。${commissionDeferred ? " 今日委託材料不足，可留到明日處理。" : ""}`, {

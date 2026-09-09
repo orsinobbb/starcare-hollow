@@ -140,7 +140,12 @@ export class ExpeditionRenderer {
     // Keep the world larger than the viewport. Logical locations are still
     // deterministic for saving and input, but a phone should feel like it is
     // looking over a real island, not at all 64 locations as a board.
-    this.tileSize = Math.min(96, Math.max(58, Math.min(this.width / 5.4, this.height / 5.4)));
+    // The island must occupy the whole viewport.  A small tile cap exposed a
+    // large, empty ocean margin on wide screens and made the exploration feel
+    // like a board embedded in a webpage.  Size the terrain to cover the
+    // camera instead; the player can still pan around its fixed-scale world.
+    const landscapeScale = Math.max(this.width / 8.5, this.height / 8.4);
+    this.tileSize = Math.min(138, Math.max(72, landscapeScale));
     this.constrainCamera();
     this.render();
   }
@@ -480,9 +485,9 @@ export class ExpeditionRenderer {
     if (!context) return;
     context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const background = context.createLinearGradient(0, 0, this.width, this.height);
-    background.addColorStop(0, "#172c4f");
-    background.addColorStop(0.58, "#263e67");
-    background.addColorStop(1, "#111e3a");
+    background.addColorStop(0, "#0b1321");
+    background.addColorStop(0.52, "#172a3a");
+    background.addColorStop(1, "#101827");
     context.fillStyle = background;
     context.fillRect(0, 0, this.width, this.height);
     this.drawAtmosphere(context);
@@ -499,7 +504,7 @@ export class ExpeditionRenderer {
       const y = ((index * 97) % (this.height + 80)) - 40;
       const radius = 12 + (index % 4) * 7;
       const glow = context.createRadialGradient(x, y, 0, x, y, radius);
-      glow.addColorStop(0, "#d9ebff");
+      glow.addColorStop(0, index % 2 ? "#ffd48b" : "#9be8df");
       glow.addColorStop(1, "rgba(217,235,255,0)");
       context.fillStyle = glow;
       context.beginPath();
@@ -556,15 +561,15 @@ export class ExpeditionRenderer {
     const height = Math.abs(end.y - start.y) + margin * 2;
 
     context.save();
-    const water = context.createRadialGradient(left + width * 0.2, top + height * 0.15, 8, left + width * 0.5, top + height * 0.55, Math.max(width, height));
-    water.addColorStop(0, "rgba(102, 199, 211, 0.35)");
-    water.addColorStop(0.55, "rgba(38, 106, 149, 0.26)");
-    water.addColorStop(1, "rgba(12, 39, 86, 0)");
-    context.fillStyle = water;
-    context.fillRect(left - margin, top - margin, width + margin * 2, height + margin * 2);
+    const cave = context.createRadialGradient(left + width * 0.45, top + height * 0.46, 8, left + width * 0.5, top + height * 0.55, Math.max(width, height));
+    cave.addColorStop(0, "rgba(78, 99, 111, 0.55)");
+    cave.addColorStop(0.55, "rgba(34, 49, 64, 0.62)");
+    cave.addColorStop(1, "rgba(8, 15, 28, 0.94)");
+    context.fillStyle = cave;
+    context.fillRect(0, 0, this.width, this.height);
 
-    context.globalAlpha = 0.42;
-    context.strokeStyle = "#8ed6e4";
+    context.globalAlpha = 0.33;
+    context.strokeStyle = "#516572";
     context.lineWidth = Math.max(1, this.tileSize * 0.018);
     for (let index = 0; index < 7; index += 1) {
       const y = top + (index + 0.6) * height / 7;
@@ -575,14 +580,14 @@ export class ExpeditionRenderer {
     }
     context.restore();
 
-    // A broad coastline makes the landmass read as an island even before the
-    // explorer has uncovered its interior.
+    // This rim is the wall of the open mine. The logical map stays the same,
+    // but there is no sea or floating board around the player.
     context.save();
     this.traceIslandShape(context);
-    context.fillStyle = "rgba(24, 52, 77, 0.68)";
+    context.fillStyle = "rgba(31, 42, 51, 0.92)";
     context.fill();
     context.lineWidth = Math.max(4, this.tileSize * 0.19);
-    context.strokeStyle = "rgba(176, 232, 221, 0.42)";
+    context.strokeStyle = "rgba(194, 151, 91, 0.5)";
     context.stroke();
     context.restore();
   }
@@ -626,17 +631,17 @@ export class ExpeditionRenderer {
     const width = southeast.x - northwest.x;
     const height = southeast.y - northwest.y;
 
-    // 1. The entire island begins as a continuous sandy shore. Repeating
+    // 1. The entire mine begins as a continuous worn shale floor. Repeating
     // strokes, not square texture stamps, give it a material surface.
     context.save();
     const sand = context.createLinearGradient(northwest.x, northwest.y, southeast.x, southeast.y);
-    sand.addColorStop(0, "#dfbd77");
-    sand.addColorStop(0.44, "#bc884d");
-    sand.addColorStop(1, "#76503c");
+    sand.addColorStop(0, "#9f774d");
+    sand.addColorStop(0.44, "#73583f");
+    sand.addColorStop(1, "#3f3737");
     context.fillStyle = sand;
     context.fillRect(northwest.x, northwest.y, width, height);
     context.globalAlpha = 0.24;
-    context.strokeStyle = "#ffe2a3";
+    context.strokeStyle = "#e9bf7b";
     context.lineWidth = Math.max(1, this.tileSize * 0.026);
     for (let index = 0; index < 12; index += 1) {
       const x = northwest.x + ((index * 137) % Math.max(1, width));
@@ -647,7 +652,7 @@ export class ExpeditionRenderer {
     }
     context.restore();
 
-    // 2. A single leaf canopy covers exactly the middle of the island where
+    // 2. A single moon-vine seam covers exactly the middle of the mine where
     // vine terrain is stored. Its irregular edge avoids a hard region seam.
     const grove = [
       // This canopy deliberately encloses every saved vine site, including
@@ -689,9 +694,9 @@ export class ExpeditionRenderer {
     }
     context.restore();
 
-    // 3. The right-hand highland is a single rock formation. The stored
-    // crystal positions live inside this silhouette, so the reward type and
-    // the place the player sees always agree.
+    // 3. The right-hand crystal seam is one continuous rock formation. The
+    // stored crystal positions live inside this silhouette, so the reward
+    // type and the place the player sees always agree.
     context.save();
     context.beginPath();
     const ridgeStart = point(4.76, 2.12);
@@ -732,24 +737,35 @@ export class ExpeditionRenderer {
     }
     context.restore();
 
-    // A soft travel trail makes the natural player intent clear: begin at
-    // camp, follow the coast through the grove, then reach the highland.
+    // Mine rails make the natural player intent clear: begin at the shaft,
+    // follow the tunnel through the vine seam, then reach the crystal face.
     context.save();
     const trail = [point(0.1, 0.12), point(1.25, 1.06), point(2.08, 2.42), point(3.28, 3.08), point(4.48, 3.88), point(5.78, 4.42)];
-    context.globalAlpha = 0.24;
-    context.strokeStyle = "#ffe9a7";
-    context.lineWidth = Math.max(2, this.tileSize * 0.1);
+    const railOffset = this.tileSize * 0.08;
+    context.globalAlpha = 0.72;
+    context.strokeStyle = "#332a2d";
+    context.lineWidth = Math.max(2, this.tileSize * 0.043);
     context.lineCap = "round";
     context.lineJoin = "round";
-    context.beginPath();
-    context.moveTo(trail[0].x, trail[0].y);
-    for (let index = 1; index < trail.length - 1; index += 1) {
-      const current = trail[index];
-      const next = trail[index + 1];
-      context.quadraticCurveTo(current.x, current.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
+    for (const offset of [-railOffset, railOffset]) {
+      context.beginPath();
+      context.moveTo(trail[0].x, trail[0].y + offset);
+      for (let index = 1; index < trail.length - 1; index += 1) {
+        const current = trail[index];
+        const next = trail[index + 1];
+        context.quadraticCurveTo(current.x, current.y + offset, (current.x + next.x) / 2, (current.y + next.y) / 2 + offset);
+      }
+      context.lineTo(trail.at(-1).x, trail.at(-1).y + offset);
+      context.stroke();
     }
-    context.lineTo(trail.at(-1).x, trail.at(-1).y);
-    context.stroke();
+    context.strokeStyle = "rgba(214, 157, 84, 0.72)";
+    context.lineWidth = Math.max(2, this.tileSize * 0.09);
+    for (const pointOnRail of trail.slice(1, -1)) {
+      context.beginPath();
+      context.moveTo(pointOnRail.x - railOffset * 1.8, pointOnRail.y - railOffset * 1.2);
+      context.lineTo(pointOnRail.x + railOffset * 1.8, pointOnRail.y + railOffset * 1.2);
+      context.stroke();
+    }
     context.restore();
   }
 
@@ -760,22 +776,57 @@ export class ExpeditionRenderer {
     const scale = this.tileSize;
     context.save();
 
-    // A small field camp gives the player an unambiguous "we arrived here".
+    // The shaft entrance gives the player an unambiguous "we arrived here".
     context.translate(camp.x - scale * 0.1, camp.y + scale * 0.04);
-    context.fillStyle = "rgba(42, 31, 35, 0.9)";
+    context.fillStyle = "rgba(28, 25, 28, 0.96)";
     context.beginPath();
-    context.moveTo(-scale * 0.3, scale * 0.2);
-    context.lineTo(0, -scale * 0.26);
-    context.lineTo(scale * 0.3, scale * 0.2);
+    context.arc(0, scale * 0.08, scale * 0.27, Math.PI, 0);
+    context.lineTo(scale * 0.27, scale * 0.23);
+    context.lineTo(-scale * 0.27, scale * 0.23);
     context.closePath();
     context.fill();
-    context.fillStyle = "#eecb84";
+    context.strokeStyle = "#8f623c";
+    context.lineWidth = Math.max(2, scale * 0.055);
     context.beginPath();
-    context.moveTo(-scale * 0.08, scale * 0.18);
-    context.lineTo(0, -scale * 0.1);
-    context.lineTo(scale * 0.08, scale * 0.18);
+    context.moveTo(-scale * 0.32, scale * 0.24);
+    context.lineTo(-scale * 0.25, -scale * 0.23);
+    context.lineTo(scale * 0.25, -scale * 0.23);
+    context.lineTo(scale * 0.32, scale * 0.24);
+    context.stroke();
+    context.strokeStyle = "#c89052";
+    context.lineWidth = Math.max(1.4, scale * 0.028);
+    context.beginPath();
+    context.moveTo(-scale * 0.32, scale * 0.24);
+    context.lineTo(scale * 0.32, scale * 0.24);
+    context.stroke();
+    const lampGlow = context.createRadialGradient(0, -scale * 0.16, 1, 0, -scale * 0.16, scale * 0.3);
+    lampGlow.addColorStop(0, "rgba(255, 238, 160, 0.92)");
+    lampGlow.addColorStop(1, "rgba(255, 183, 91, 0)");
+    context.fillStyle = lampGlow;
+    context.beginPath();
+    context.arc(0, -scale * 0.16, scale * 0.3, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#ffe19a";
+    context.beginPath();
+    context.arc(0, -scale * 0.16, scale * 0.055, 0, Math.PI * 2);
+    context.fill();
+
+    // A waiting mine cart makes the rail language tangible from the first
+    // frame, before the player has excavated a second location.
+    context.fillStyle = "#473a39";
+    context.beginPath();
+    context.moveTo(scale * 0.22, scale * 0.27);
+    context.lineTo(scale * 0.53, scale * 0.27);
+    context.lineTo(scale * 0.45, scale * 0.45);
+    context.lineTo(scale * 0.28, scale * 0.45);
     context.closePath();
     context.fill();
+    context.fillStyle = "#151925";
+    for (const wheelX of [scale * 0.3, scale * 0.46]) {
+      context.beginPath();
+      context.arc(wheelX, scale * 0.48, scale * 0.045, 0, Math.PI * 2);
+      context.fill();
+    }
     context.restore();
 
     context.save();
@@ -823,8 +874,8 @@ export class ExpeditionRenderer {
     const width = Math.abs(end.x - start.x) + this.tileSize * 2;
     const height = Math.abs(end.y - start.y) + this.tileSize * 2;
 
-    // Mist conceals secrets, not the ground itself. The land stays legible as
-    // a coherent island; only the bright beacons and excavated hollows tell
+    // Mine haze conceals secrets, not the ground itself. The mine stays
+    // legible as one coherent place; only the bright beacons and hollows tell
     // the player what has actually been explored.
     context.save();
     const mist = context.createLinearGradient(left, top, left + width, top + height);

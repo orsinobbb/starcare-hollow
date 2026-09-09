@@ -4985,6 +4985,396 @@ body[data-view="expedition"] .compass-card {
   }
 }
 
+/* v0.9 — 遠征開啟後，瀏覽器退到幕後：只留下可觸碰的礦島與場景內 HUD。 */
+body[data-view="expedition"] {
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #071936;
+}
+
+body[data-view="expedition"] .app-shell,
+body[data-view="expedition"] #main-content {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  padding: 0;
+  margin: 0;
+}
+
+body[data-view="expedition"] .game-header > .brand-block,
+body[data-view="expedition"] .game-header > #town-hud,
+body[data-view="expedition"] .game-header > #shift-hud,
+body[data-view="expedition"] .game-header > #clinic-controls,
+body[data-view="expedition"] .world-nav,
+body[data-view="expedition"] #town-view,
+body[data-view="expedition"] #clinic-view {
+  display: none !important;
+}
+
+/* The header remains only as a transparent HUD host.  Everything which reads
+   as site chrome is hidden above; the expedition HUD is fixed to the scene. */
+body[data-view="expedition"] .game-header {
+  position: static;
+  display: block;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body[data-view="expedition"] .expedition-view {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: block;
+  overflow: hidden;
+  isolation: isolate;
+  background: #071936;
+}
+
+body[data-view="expedition"] .expedition-banner {
+  position: fixed;
+  top: max(0.7rem, env(safe-area-inset-top));
+  left: max(0.7rem, env(safe-area-inset-left));
+  z-index: 42;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-view="expedition"] .expedition-banner::after,
+body[data-view="expedition"] .expedition-banner > div,
+body[data-view="expedition"] .expedition-map-heading,
+body[data-view="expedition"] .expedition-map-help,
+body[data-view="expedition"] .expedition-log,
+body[data-view="expedition"] .expedition-principles {
+  display: none;
+}
+
+body[data-view="expedition"] #expedition-return {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  place-items: center;
+  overflow: hidden;
+  color: #fff0bf;
+  background: rgba(8, 24, 50, 0.82);
+  border-color: rgba(255, 239, 184, 0.45);
+  border-radius: 50%;
+  box-shadow: 0 7px 22px rgba(0, 8, 29, 0.42);
+  backdrop-filter: blur(12px);
+}
+
+body[data-view="expedition"] #expedition-return > span {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+body[data-view="expedition"] .expedition-layout,
+body[data-view="expedition"] .expedition-map-card {
+  display: block;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-view="expedition"] #expedition-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 31;
+  display: block;
+  width: 100vw !important;
+  height: 100dvh !important;
+  background: #071936;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-view="expedition"] .expedition-hud {
+  position: fixed;
+  top: max(0.7rem, env(safe-area-inset-top));
+  left: 4.35rem;
+  z-index: 43;
+  display: grid;
+  grid-template-columns: minmax(136px, 1.2fr) minmax(86px, 0.72fr) minmax(102px, 0.86fr) auto;
+  gap: 0;
+  width: min(650px, calc(100vw - 5.25rem));
+  padding: 0.3rem 0.38rem;
+  background: rgba(7, 23, 48, 0.78);
+  border: 1px solid rgba(235, 239, 213, 0.2);
+  border-radius: 15px;
+  box-shadow: 0 8px 28px rgba(0, 8, 29, 0.4);
+  backdrop-filter: blur(15px);
+}
+
+body[data-view="expedition"] .expedition-hud .hud-stat {
+  padding: 0.36rem 0.55rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-view="expedition"] .expedition-hud .hud-stat + .hud-stat {
+  border-left: 1px solid rgba(235, 239, 213, 0.18);
+}
+
+body[data-view="expedition"] .expedition-hud .hud-label {
+  font-size: 0.59rem;
+}
+
+body[data-view="expedition"] .expedition-hud .hud-stat strong {
+  font-size: 0.88rem;
+}
+
+.expedition-recovery {
+  display: block;
+  min-height: 1.1em;
+  margin-top: 0.08rem;
+  color: #bfeccc;
+  font-size: 0.59rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.expedition-hud-action {
+  min-width: 4.15rem;
+  margin-left: 0.28rem;
+  padding: 0.35rem 0.6rem;
+  color: #fff3c6;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  background: linear-gradient(145deg, rgba(73, 133, 111, 0.92), rgba(33, 78, 76, 0.96));
+  border: 1px solid rgba(207, 247, 186, 0.47);
+  border-radius: 10px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12);
+}
+
+body[data-view="expedition"] .expedition-side-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: block;
+  pointer-events: none;
+}
+
+body[data-view="expedition"] .expedition-side-panel > section {
+  pointer-events: auto;
+  background: linear-gradient(145deg, rgba(10, 32, 61, 0.9), rgba(12, 38, 58, 0.9));
+  border: 1px solid rgba(228, 239, 213, 0.22);
+  box-shadow: 0 12px 32px rgba(0, 8, 29, 0.38);
+  backdrop-filter: blur(14px);
+}
+
+body[data-view="expedition"] .compass-card {
+  position: absolute;
+  top: max(5.35rem, calc(env(safe-area-inset-top) + 4.65rem));
+  right: max(0.85rem, env(safe-area-inset-right));
+  width: min(234px, calc(100vw - 1.7rem));
+  padding: 0.75rem 0.82rem;
+  border-radius: 14px;
+}
+
+body[data-view="expedition"] .compass-card .eyebrow,
+body[data-view="expedition"] .excavation-card .eyebrow {
+  margin-bottom: 0.1rem;
+  font-size: 0.56rem;
+}
+
+body[data-view="expedition"] .compass-card h3,
+body[data-view="expedition"] .excavation-card h3 {
+  max-width: calc(100% - 2.5rem);
+  margin-bottom: 0.12rem;
+  font-size: 0.95rem;
+}
+
+body[data-view="expedition"] .compass-card > p:not(.eyebrow),
+body[data-view="expedition"] .excavation-card > p {
+  min-height: 0;
+  margin: 0;
+  font-size: 0.67rem;
+  line-height: 1.38;
+}
+
+body[data-view="expedition"] .compass-ring {
+  width: 54px;
+  height: 54px;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  font-size: 1.35rem;
+}
+
+body[data-view="expedition"] .excavation-card {
+  position: absolute;
+  right: max(0.85rem, env(safe-area-inset-right));
+  bottom: max(0.9rem, env(safe-area-inset-bottom));
+  width: min(340px, calc(100vw - 1.7rem));
+  padding: 0.78rem;
+  border-radius: 16px;
+}
+
+body[data-view="expedition"] .excavation-card > .expedition-queue {
+  padding: 0.38rem 0.46rem;
+  margin-top: 0.42rem;
+  font-size: 0.63rem;
+}
+
+body[data-view="expedition"] .excavation-card > .primary-button {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+body[data-view="expedition"] .expedition-map-controls {
+  display: none;
+}
+
+body[data-view="expedition"] .expedition-stage {
+  position: fixed;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: max(0.85rem, env(safe-area-inset-left));
+  z-index: 41;
+  width: min(365px, calc(100vw - 23.8rem));
+  min-height: 3.35rem;
+  padding: 0.55rem 0.7rem;
+  margin: 0;
+  background: linear-gradient(100deg, rgba(7, 27, 53, 0.87), rgba(21, 63, 68, 0.82));
+  border-color: rgba(191, 238, 206, 0.3);
+  border-radius: 14px;
+  box-shadow: 0 9px 28px rgba(0, 8, 29, 0.33);
+  backdrop-filter: blur(10px);
+}
+
+body[data-view="expedition"] .expedition-stage > p {
+  font-size: 0.69rem;
+  line-height: 1.35;
+}
+
+body[data-view="expedition"] .expedition-supply-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(360px, calc(100vw - 2rem));
+  padding: 1rem;
+  border-radius: 19px;
+  transform: translate(-50%, -50%);
+}
+
+.expedition-panel-close {
+  position: absolute;
+  top: 0.58rem;
+  right: 0.58rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  place-items: center;
+  color: #fff0c0;
+  font: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+}
+
+@media (max-width: 700px) {
+  body[data-view="expedition"] .expedition-hud {
+    top: max(0.45rem, env(safe-area-inset-top));
+    left: 3.8rem;
+    grid-template-columns: minmax(105px, 1.1fr) minmax(60px, 0.65fr) auto;
+    width: calc(100vw - 4.25rem);
+    padding: 0.26rem;
+  }
+
+  body[data-view="expedition"] .expedition-hud .hud-stat:nth-child(3) {
+    display: none;
+  }
+
+  body[data-view="expedition"] .expedition-hud .hud-stat {
+    padding: 0.28rem 0.38rem;
+  }
+
+  body[data-view="expedition"] .expedition-hud .hud-label,
+  .expedition-recovery {
+    font-size: 0.52rem;
+  }
+
+  body[data-view="expedition"] .expedition-hud .hud-stat strong {
+    font-size: 0.76rem;
+  }
+
+  .expedition-hud-action {
+    min-width: 3.45rem;
+    padding-inline: 0.38rem;
+  }
+
+  body[data-view="expedition"] .compass-card {
+    top: max(4.55rem, calc(env(safe-area-inset-top) + 4.1rem));
+    right: 0.55rem;
+    width: min(202px, calc(100vw - 1.1rem));
+    padding: 0.55rem 0.62rem;
+  }
+
+  body[data-view="expedition"] .excavation-card {
+    right: 0.55rem;
+    bottom: max(0.55rem, env(safe-area-inset-bottom));
+    left: 0.55rem;
+    width: auto;
+    padding: 0.62rem;
+  }
+
+  body[data-view="expedition"] .excavation-card .eyebrow,
+  body[data-view="expedition"] .excavation-card > .expedition-queue {
+    display: none;
+  }
+
+  body[data-view="expedition"] .excavation-card h3 {
+    max-width: 100%;
+    font-size: 0.84rem;
+  }
+
+  body[data-view="expedition"] .excavation-card > p:not(.eyebrow) {
+    font-size: 0.6rem;
+  }
+
+  body[data-view="expedition"] .expedition-stage {
+    bottom: 8.8rem;
+    left: 0.55rem;
+    width: min(300px, calc(100vw - 1.1rem));
+    min-height: 2.8rem;
+    padding: 0.42rem 0.52rem;
+  }
+
+  body[data-view="expedition"] .expedition-stage > span {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.9rem;
+  }
+
+  body[data-view="expedition"] .expedition-stage > p {
+    font-size: 0.58rem;
+  }
+}
+
 @media (max-width: 620px) {
   body[data-view="expedition"] .app-shell {
     width: min(calc(100% - 0.75rem), 1540px);
@@ -5004,5 +5394,28 @@ body[data-view="expedition"] .compass-card {
     grid-template-columns: 1.9rem minmax(0, 1fr);
     min-height: 3.7rem;
     margin-top: -5.05rem;
+  }
+}
+
+/* Keep the expedition a stable full-viewport game on phones as well.  These
+   declarations deliberately follow the former card-layout media rules. */
+@media (max-width: 620px) {
+  body[data-view="expedition"] .app-shell,
+  body[data-view="expedition"] #main-content {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    padding: 0;
+    margin: 0;
+  }
+
+  body[data-view="expedition"] #expedition-canvas {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  body[data-view="expedition"] .expedition-stage {
+    margin: 0;
   }
 }

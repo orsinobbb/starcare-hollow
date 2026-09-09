@@ -1,4 +1,13 @@
-import { EXPEDITION_FOCUS_MAX, canExcavate, createExpeditionState, excavate, isInBounds, regionAt, terrainAt } from "./expedition-engine.js";
+import {
+  EXPEDITION_FOCUS_MAX,
+  canExcavate,
+  createExpeditionState,
+  excavate,
+  isInBounds,
+  recoverExpeditionFocus,
+  regionAt,
+  terrainAt
+} from "./expedition-engine.js";
 import {
   COMMISSION_MOONLEAF_COST,
   EXPEDITION_FOCUS_MOONLEAF_COST,
@@ -11,6 +20,13 @@ function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+function countdownText(milliseconds) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function createExpeditionController({ root = document, townController, onLeave = () => {}, onNotify = () => {} } = {}) {
   const element = (selector) => root.querySelector(selector);
   const canvas = element("#expedition-canvas");
@@ -20,9 +36,11 @@ export function createExpeditionController({ root = document, townController, on
   let selectedTile = { x: 1, y: 0 };
   let isAnimating = false;
   let queuedTile = null;
+  let recoveryTimer = null;
   const ui = {
     view: element("#expedition-view"),
     focus: element("#expedition-focus"),
+    recovery: element("#expedition-recovery"),
     relics: element("#expedition-relics"),
     progress: element("#expedition-progress"),
     clueTitle: element("#expedition-clue-title"),
@@ -34,6 +52,9 @@ export function createExpeditionController({ root = document, townController, on
     supplyDetail: element("#expedition-supply-detail"),
     supplySource: element("#expedition-supply-source"),
     resupply: element("#expedition-resupply"),
+    supplyPanel: element("#expedition-supply-panel"),
+    openSupply: element("#expedition-open-supply"),
+    closeSupply: element("#expedition-close-supply"),
     log: element("#expedition-log"),
     compass: element("#expedition-compass"),
     stage: element("#expedition-stage"),
@@ -74,9 +95,9 @@ export function createExpeditionController({ root = document, townController, on
   function locationNameFor(x, y) {
     const region = regionAt(state, x, y);
     const localities = {
-      shore: ["雲舟營地旁", "潮痕淺灘", "貝風坡", "暖沙灣", "潮池邊"],
-      grove: ["藤語古徑", "月藤樹根", "螢葉小徑", "露珠空地", "花蔭深處"],
-      ridge: ["碎星斷崖", "晶脈坡", "雲階石壁", "回聲礦脈", "高地望台"]
+      shore: ["入口營地", "潮痕淺層", "貝礦堆", "暖砂礦帶", "潮池礦壁"],
+      grove: ["藤根坑道", "月藤支脈", "螢葉支坑", "露珠礦室", "花蔭斷層"],
+      ridge: ["碎星斷崖", "晶脈坡", "雲階岩壁", "回聲礦脈", "高地望台"]
     };
     const names = localities[region.id] ?? localities.shore;
     const locality = names[(x * 3 + y * 5) % names.length];
@@ -92,10 +113,46 @@ export function createExpeditionController({ root = document, townController, on
     return text || "小鎮材料";
   }
 
+  function synchronizePassiveFocus(now = Date.now()) {
+    const recovery = recoverExpeditionFocus(state, now);
+    if (recovery.recovered > 0) {
+      const result = townController.recordExpedition(recovery.state, {
+        type: "focus-recovery",
+        recovered: recovery.recovered,
+        message: `羅盤隨時間回復 ${recovery.recovered} 點專注。`
+      });
+      state = result.state.expedition;
+      // Recalculate the countdown against the persisted state, while keeping
+      // the earned amount for the caller so the renderer can refresh the HUD.
+      return { ...recoverExpeditionFocus(state, now), recovered: recovery.recovered };
+    }
+    return recovery;
+  }
+
+  function renderRecovery(recovery = synchronizePassiveFocus()) {
+    if (!ui.recovery) return;
+    ui.recovery.textContent = state.focus >= EXPEDITION_FOCUS_MAX
+      ? "專注充足"
+      : `${countdownText(recovery.remainingMs)} 後回復 +1`;
+  }
+
+  function setSupplyOpen(open) {
+    if (!ui.supplyPanel) return;
+    ui.supplyPanel.hidden = !open;
+    ui.openSupply?.setAttribute("aria-expanded", String(open));
+    if (open) {
+      render();
+      window.setTimeout(() => ui.resupply?.focus({ preventScroll: true }), 0);
+    } else {
+      canvas.focus({ preventScroll: true });
+    }
+  }
+
   function renderSelection() {
     if (!isInBounds(state, selectedTile.x, selectedTile.y)) selectedTile = { x: 0, y: 0 };
     const terrain = selectedTerrain();
     const permission = canExcavate(state, selectedTile.x, selectedTile.y);
+    const focusRecovery = recoverExpeditionFocus(state);
     const location = locationNameFor(selectedTile.x, selectedTile.y);
     if (ui.selected) ui.selected.textContent = location;
     const queued = queuedTile && queuedTile.x === selectedTile.x && queuedTile.y === selectedTile.y;
@@ -107,7 +164,7 @@ export function createExpeditionController({ root = document, townController, on
         : permission.ok
         ? `${terrain.name}地貌 · 踏查消耗 ${terrain.cost} 專注`
         : permission.reason === "focus"
-        ? `${permission.message} 月芽暖茶可回復專注。`
+        ? `${permission.message} ${countdownText(focusRecovery.remainingMs)} 後自然回復 +1；月芽暖茶只是在想立刻前進時的選用補給。`
         : permission.message;
     }
     if (ui.queue) {
@@ -130,7 +187,7 @@ export function createExpeditionController({ root = document, townController, on
     canvas.setAttribute("aria-busy", String(isAnimating));
   }
 
-  function renderSupply() {
+  function renderSupply(recovery = synchronizePassiveFocus()) {
     const town = townController.snapshot();
     const moonleaf = town.resources.moonleaf;
     const missing = Math.max(0, EXPEDITION_FOCUS_MAX - state.focus);
@@ -141,10 +198,10 @@ export function createExpeditionController({ root = document, townController, on
     const teaDefersCommission = commissionPending && moonleaf - EXPEDITION_FOCUS_MOONLEAF_COST < COMMISSION_MOONLEAF_COST;
     if (ui.supplyDetail) {
       ui.supplyDetail.textContent = full
-        ? "羅盤專注充足。把月芽葉留給下一段路；每一次調查仍會完整記入地圖。"
+        ? "羅盤專注充足。每 5 分鐘會自然回復 1 點；把月芽葉留給想立刻多走一段路的時候。"
         : hasMoonleaf
-        ? `目前有 ${moonleaf} 片月芽葉。現在補給可回復 ${restored} 點專注。${teaDefersCommission ? ` 飲用後今日居民委託會改由明日處理；完成任 ${MINIMUM_DAILY_WISHES_FOR_REST} 項星願仍可休息。` : commissionPending ? " 飲用後仍保有今日委託材料。" : " 今日委託已送達，可安心補給。"}`
-        : `現在沒有月芽葉。回小鎮的月芽藥園採收；今日委託是選做，完成任 ${MINIMUM_DAILY_WISHES_FOR_REST} 項星願即可進入下一日。`;
+        ? `自然回復：${countdownText(recovery.remainingMs)} 後 +1。你有 ${moonleaf} 片月芽葉，若現在想繼續，可即時回復 ${restored} 點。${teaDefersCommission ? ` 飲用後今日居民委託會改由明日處理；完成任 ${MINIMUM_DAILY_WISHES_FOR_REST} 項星願仍可休息。` : commissionPending ? " 飲用後仍保有今日委託材料。" : " 今日委託已送達，可安心補給。"}`
+        : `自然回復：${countdownText(recovery.remainingMs)} 後 +1。現在沒有月芽葉也不會卡關；等候回復即可，或回小鎮的月芽藥園採收。今日委託是選做。`;
     }
     if (ui.supplySource) {
       ui.supplySource.textContent = `月芽葉 ${moonleaf} 片 · ${commissionPending ? `居民委託需要 ${COMMISSION_MOONLEAF_COST} 片（可留明日）` : "今日委託已送達"}`;
@@ -160,18 +217,20 @@ export function createExpeditionController({ root = document, townController, on
   }
 
   function render() {
+    const recovery = synchronizePassiveFocus();
     const found = state.foundTargetIds.length;
     if (ui.focus) ui.focus.textContent = `${state.focus} / ${EXPEDITION_FOCUS_MAX}`;
+    renderRecovery(recovery);
     if (ui.relics) ui.relics.textContent = `${found} / ${state.targets.length}`;
     const explored = Math.max(0, state.revealed.length - 1);
     if (ui.progress) ui.progress.textContent = `已踏查 ${explored} 處`;
     if (ui.clueTitle) ui.clueTitle.textContent = state.lastClue.title;
     if (ui.clueDetail) ui.clueDetail.textContent = state.lastClue.detail;
     if (ui.compass) ui.compass.dataset.clue = state.lastClue.level;
-    canvas.setAttribute("aria-label", `穹星海岬探索地圖。已踏查 ${explored} 處，找到 ${found} / ${state.targets.length} 件主要遺物。使用方向鍵選擇探索點，Enter 踏查。`);
+    canvas.setAttribute("aria-label", `穹星礦場踏查地圖。已踏查 ${explored} 處，找到 ${found} / ${state.targets.length} 件主要遺物。使用方向鍵選擇礦點，Enter 踏查。`);
     renderer.setState(state);
     renderSelection();
-    renderSupply();
+    renderSupply(recovery);
   }
 
   function resupplyFocus() {
@@ -191,11 +250,15 @@ export function createExpeditionController({ root = document, townController, on
   }
 
   function queueExcavation(x, y) {
+    synchronizePassiveFocus();
     const permission = canExcavate(state, x, y);
     if (!permission.ok) {
-      if (ui.log) ui.log.textContent = permission.message;
-      onNotify(permission.message);
-      return { ok: false, state, message: permission.message, event: null };
+      const message = permission.reason === "focus"
+        ? `${permission.message} ${countdownText(recoverExpeditionFocus(state).remainingMs)} 後自然回復 +1。`
+        : permission.message;
+      if (ui.log) ui.log.textContent = message;
+      onNotify(message);
+      return { ok: false, state, message, event: null };
     }
     queuedTile = { x, y };
     selectedTile = { x, y };
@@ -249,6 +312,7 @@ export function createExpeditionController({ root = document, townController, on
   }
 
   function requestExcavate(x, y) {
+    synchronizePassiveFocus();
     if (isAnimating) return queueExcavation(x, y);
     return beginExcavation(x, y);
   }
@@ -264,6 +328,8 @@ export function createExpeditionController({ root = document, townController, on
 
   element("#expedition-dig")?.addEventListener("click", () => requestExcavate(selectedTile.x, selectedTile.y));
   ui.resupply?.addEventListener("click", resupplyFocus);
+  ui.openSupply?.addEventListener("click", () => setSupplyOpen(true));
+  ui.closeSupply?.addEventListener("click", () => setSupplyOpen(false));
   element("#expedition-map-controls")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-expedition-move]");
     if (!button) return;
@@ -285,13 +351,23 @@ export function createExpeditionController({ root = document, townController, on
       renderer.resize();
       renderer.start();
       render();
+      if (!recoveryTimer) recoveryTimer = window.setInterval(() => {
+        const recovery = synchronizePassiveFocus();
+        renderRecovery(recovery);
+        if (recovery.recovered > 0) render();
+      }, 1000);
     },
     hide() {
       renderer.stop();
+      if (recoveryTimer) window.clearInterval(recoveryTimer);
+      recoveryTimer = null;
     },
     snapshot: () => structuredClone(state),
     excavate: requestExcavate,
     resupply: resupplyFocus,
-    destroy: () => renderer.destroy()
+    destroy: () => {
+      if (recoveryTimer) window.clearInterval(recoveryTimer);
+      renderer.destroy();
+    }
   };
 }

@@ -1,13 +1,17 @@
-export const EXPEDITION_SCHEMA_VERSION = 2;
+export const EXPEDITION_SCHEMA_VERSION = 3;
 export const EXPEDITION_ID = "starsand-prototype";
 export const EXPEDITION_WIDTH = 8;
 export const EXPEDITION_HEIGHT = 8;
 export const EXPEDITION_FOCUS_MAX = 30;
+// One point every five minutes makes a fully empty compass recover in a
+// predictable 2.5 hours.  This is intentionally a clock-based safety net:
+// tea is an optional convenience, never the only way out of an expedition.
+export const EXPEDITION_FOCUS_REGEN_INTERVAL_MS = 5 * 60 * 1000;
 
 export const TERRAIN = Object.freeze({
-  sand: { id: "sand", name: "星砂", cost: 1, symbol: "·", reward: { coins: 4 } },
-  vine: { id: "vine", name: "月藤", cost: 2, symbol: "⌇", reward: { coins: 6, moonleaf: 1 } },
-  crystal: { id: "crystal", name: "晶岩", cost: 3, symbol: "✧", reward: { coins: 9, starlight: 1 } }
+  sand: { id: "sand", name: "星砂淺層", cost: 1, symbol: "·", reward: { coins: 4 } },
+  vine: { id: "vine", name: "月藤礦脈", cost: 2, symbol: "⌇", reward: { coins: 6, moonleaf: 1 } },
+  crystal: { id: "crystal", name: "星晶岩脈", cost: 3, symbol: "✧", reward: { coins: 9, starlight: 1 } }
 });
 
 const TARGETS = Object.freeze([
@@ -17,9 +21,9 @@ const TARGETS = Object.freeze([
 ]);
 
 export const EXPEDITION_REGIONS = Object.freeze({
-  shore: { id: "shore", name: "晨潮沙灣", terrain: "sand", landmark: "雲舟營地" },
-  grove: { id: "grove", name: "月藤密林", terrain: "vine", landmark: "藤語古徑" },
-  ridge: { id: "ridge", name: "星晶高地", terrain: "crystal", landmark: "碎星斷崖" }
+  shore: { id: "shore", name: "雲舟礦場", terrain: "sand", landmark: "入口營地" },
+  grove: { id: "grove", name: "月藤坑道", terrain: "vine", landmark: "藤根支坑" },
+  ridge: { id: "ridge", name: "星晶礦層", terrain: "crystal", landmark: "碎星斷崖" }
 });
 
 function clone(value) {
@@ -78,7 +82,7 @@ function chooseTargets() {
   return TARGETS.map((target) => ({ ...target }));
 }
 
-export function createExpeditionState(seed = "starsand-001") {
+export function createExpeditionState(seed = "starsand-001", now = Date.now()) {
   const terrain = {};
   for (let y = 0; y < EXPEDITION_HEIGHT; y += 1) {
     for (let x = 0; x < EXPEDITION_WIDTH; x += 1) terrain[tileKey(x, y)] = terrainFor(x, y);
@@ -91,6 +95,7 @@ export function createExpeditionState(seed = "starsand-001") {
     width: EXPEDITION_WIDTH,
     height: EXPEDITION_HEIGHT,
     focus: EXPEDITION_FOCUS_MAX,
+    focusUpdatedAt: Math.max(0, Math.floor(Number(now) || Date.now())),
     terrain,
     targets: chooseTargets(),
     revealed: [tileKey(0, 0)],
@@ -100,7 +105,7 @@ export function createExpeditionState(seed = "starsand-001") {
     lastClue: {
       level: "silent",
       title: "羅盤待命",
-      detail: "從雲舟營地旁亮起的星標開始踏查。",
+      detail: "從入口營地旁亮起的礦點開始踏查。",
       distance: null
     }
   };
@@ -122,13 +127,13 @@ export function normalizeExpeditionState(raw) {
   const fallback = createExpeditionState(typeof raw.seed === "string" ? raw.seed : "starsand-001");
   // v1 scattered terrain by random roll. Preserve earned progress but migrate
   // the physical map to the coherent geography used by the new island.
-  const terrain = raw.schemaVersion < EXPEDITION_SCHEMA_VERSION
+  const terrain = raw.schemaVersion < 2
     ? fallback.terrain
     : Object.fromEntries(
       Object.keys(fallback.terrain).map((key) => [key, TERRAIN[raw.terrain?.[key]] ? raw.terrain[key] : fallback.terrain[key]])
     );
   const validTargetIds = new Set(fallback.targets.map((target) => target.id));
-  const sourceTargets = raw.schemaVersion < EXPEDITION_SCHEMA_VERSION
+  const sourceTargets = raw.schemaVersion < 2
     ? fallback.targets
     : Array.isArray(raw.targets) && raw.targets.length === fallback.targets.length ? raw.targets : fallback.targets;
   const targets = sourceTargets.map((target, index) => {
@@ -148,6 +153,10 @@ export function normalizeExpeditionState(raw) {
   return {
     ...fallback,
     focus: Math.min(EXPEDITION_FOCUS_MAX, integer(raw.focus, fallback.focus)),
+    // Older saves did not track the clock.  Start their first recovery cycle
+    // from the moment they are opened rather than granting an accidental full
+    // refill from an unknown timestamp.
+    focusUpdatedAt: integer(raw.focusUpdatedAt, fallback.focusUpdatedAt),
     terrain,
     targets,
     revealed: uniqueTileKeys(raw.revealed, fallback.width, fallback.height),
@@ -162,6 +171,45 @@ export function normalizeExpeditionState(raw) {
           distance: Number.isInteger(raw.lastClue.distance) ? raw.lastClue.distance : null
         }
       : fallback.lastClue
+  };
+}
+
+/**
+ * Applies the passive, real-time focus recovery without mutating the saved
+ * state.  Controllers may call this on a timer and persist it only when a
+ * whole point has actually returned.
+ */
+export function recoverExpeditionFocus(state, now = Date.now()) {
+  const current = Math.min(EXPEDITION_FOCUS_MAX, integer(state?.focus, EXPEDITION_FOCUS_MAX));
+  const currentTime = Math.max(0, Math.floor(Number(now) || Date.now()));
+  const updatedAt = integer(state?.focusUpdatedAt, currentTime);
+
+  if (current >= EXPEDITION_FOCUS_MAX) {
+    return {
+      state,
+      recovered: 0,
+      remainingMs: 0,
+      nextRecoveryAt: null
+    };
+  }
+
+  const elapsed = Math.max(0, currentTime - updatedAt);
+  const recovered = Math.min(EXPEDITION_FOCUS_MAX - current, Math.floor(elapsed / EXPEDITION_FOCUS_REGEN_INTERVAL_MS));
+  const nextFocus = current + recovered;
+  const nextUpdatedAt = nextFocus >= EXPEDITION_FOCUS_MAX
+    ? currentTime
+    : updatedAt + recovered * EXPEDITION_FOCUS_REGEN_INTERVAL_MS;
+  const remainingMs = nextFocus >= EXPEDITION_FOCUS_MAX
+    ? 0
+    : Math.max(0, EXPEDITION_FOCUS_REGEN_INTERVAL_MS - Math.max(0, currentTime - nextUpdatedAt));
+
+  return {
+    state: recovered > 0
+      ? { ...state, focus: nextFocus, focusUpdatedAt: nextUpdatedAt }
+      : state,
+    recovered,
+    remainingMs,
+    nextRecoveryAt: nextFocus >= EXPEDITION_FOCUS_MAX ? null : nextUpdatedAt + EXPEDITION_FOCUS_REGEN_INTERVAL_MS
   };
 }
 
@@ -205,7 +253,7 @@ export function compassClue(state, x, y) {
 }
 
 export function canExcavate(state, x, y) {
-  if (!isInBounds(state, x, y)) return { ok: false, message: "那裡不在這座浮島上。" };
+  if (!isInBounds(state, x, y)) return { ok: false, message: "那裡不在這座礦場範圍內。" };
   if (isRevealed(state, x, y)) return { ok: false, message: "這一格已經調查過了。" };
   if (!isAdjacentToRevealed(state, x, y)) return { ok: false, message: "只能從已開啟格的上下左右繼續探索。" };
   const terrain = terrainAt(state, x, y);
@@ -213,14 +261,17 @@ export function canExcavate(state, x, y) {
   return { ok: true, terrain };
 }
 
-export function excavate(state, x, y) {
-  const permission = canExcavate(state, x, y);
-  if (!permission.ok) return { ok: false, state, message: permission.message, event: null };
+export function excavate(state, x, y, now = Date.now()) {
+  const recovered = recoverExpeditionFocus(state, now);
+  const activeState = recovered.state;
+  const permission = canExcavate(activeState, x, y);
+  if (!permission.ok) return { ok: false, state: activeState, message: permission.message, event: null };
 
-  const next = clone(state);
+  const next = clone(activeState);
   const terrain = permission.terrain;
   const key = tileKey(x, y);
   next.focus -= terrain.cost;
+  next.focusUpdatedAt = Math.max(0, Math.floor(Number(now) || Date.now()));
   next.revealed.push(key);
   next.digs += 1;
 
@@ -230,7 +281,7 @@ export function excavate(state, x, y) {
     next.foundTargetIds.push(target.id);
     discovery = target;
   }
-  const newlyCompleted = !state.completed && next.foundTargetIds.length === next.targets.length;
+  const newlyCompleted = !activeState.completed && next.foundTargetIds.length === next.targets.length;
   next.completed = next.foundTargetIds.length === next.targets.length;
   next.lastClue = compassClue(next, x, y);
   const reward = combineRewards(terrain.reward, discovery?.reward);
@@ -260,5 +311,6 @@ export function refillFocus(state, amount) {
   const next = clone(state);
   const before = next.focus;
   next.focus = Math.min(EXPEDITION_FOCUS_MAX, next.focus + integer(amount, 0));
+  if (next.focus > before) next.focusUpdatedAt = Date.now();
   return { state: next, gained: next.focus - before };
 }
