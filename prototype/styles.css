@@ -6948,3 +6948,114 @@ html body[data-view="town"] .town-building:has(.town-place-hitbox:focus-visible)
   border-color: #fff8cf;
   box-shadow: 0 0 0 3px rgba(35, 27, 10, 0.72), 0 0 30px rgba(255, 222, 117, 0.95), inset 0 0 18px rgba(255, 250, 220, 0.42);
 }
+
+/* v0.13 — readable RPG status, inventory and respected action feedback */
+[hidden] { display: none !important; }
+
+body[data-view="expedition"] .expedition-hud {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(135px, 1fr) minmax(145px, 1.15fr) 88px 100px;
+  gap: 6px;
+  align-items: stretch;
+  padding: 7px;
+  background: linear-gradient(150deg, rgba(7, 18, 35, .94), rgba(17, 46, 54, .9));
+  border: 1px solid rgba(255, 225, 156, .34);
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgba(0, 5, 18, .48);
+  backdrop-filter: blur(14px);
+}
+
+.expedition-player-card { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rpg-portrait { position: relative; flex: 0 0 48px; width: 48px; height: 48px; overflow: hidden; border: 2px solid #f7d987; border-radius: 50%; background: radial-gradient(circle at 45% 35%, #ffdcbc 0 26%, #724428 27% 38%, #203d4c 39%); box-shadow: 0 0 14px rgba(255,216,118,.42); }
+.rpg-portrait .portrait-hair { position: absolute; inset: 4px 7px 21px; background: #53311f; border-radius: 50% 55% 42% 45%; transform: rotate(-7deg); }
+.rpg-portrait .portrait-face { position: absolute; width: 22px; height: 22px; left: 12px; top: 13px; border-radius: 48% 48% 55% 55%; background: #ffd9bd; box-shadow: inset 5px 0 rgba(241,166,128,.22); }
+.rpg-portrait .portrait-face::after { content: "••"; position: absolute; top: 4px; left: 5px; color: #2b3044; font-size: 11px; letter-spacing: 5px; }
+.rpg-portrait .portrait-coat { position: absolute; width: 38px; height: 23px; left: 5px; top: 33px; border-radius: 50% 50% 0 0; background: #d98248; border-top: 4px solid #f0c163; }
+.rpg-portrait .portrait-star { position: absolute; right: 0; top: 2px; color: #fff0a6; font-style: normal; filter: drop-shadow(0 0 4px #ffd24f); }
+.player-copy { display: grid; min-width: 0; line-height: 1.08; }
+.player-copy small { color: #bfdbc9; font-size: .65rem; }
+.player-copy strong { color: #fff4d4; white-space: nowrap; }
+.player-copy b { margin-left: 3px; color: #95ead1; font-size: .7rem; }
+.player-xp, .focus-meter { display: block; height: 5px; margin-top: 5px; overflow: hidden; border-radius: 99px; background: rgba(0,0,0,.46); }
+.player-xp i, .focus-meter i { display: block; width: 0; height: 100%; background: linear-gradient(90deg,#69d6c4,#ffe082); transition: width .35s ease; }
+.expedition-focus-stat .focus-meter { height: 6px; }
+.expedition-hud .hud-stat { min-width: 0; padding: 4px 7px; border-left: 1px solid rgba(255,255,255,.1); }
+.expedition-hud .hud-stat strong { font-size: .84rem; color: #fff3cf; }
+.expedition-hud .hud-label { color: #a8c9c2; font-size: .62rem; }
+.expedition-resource-strip { grid-column: 1 / span 3; display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; }
+.expedition-resource-strip > span { display: grid; grid-template-columns: 22px 1fr; grid-template-rows: auto auto; align-items: center; padding: 5px 8px; border: 1px solid rgba(255,222,142,.18); border-radius: 11px; background: rgba(5,17,31,.6); }
+.expedition-resource-strip i { grid-row: 1/3; font-style: normal; font-size: 1.05rem; }
+.expedition-resource-strip b { color: #fff0b8; font-size: .85rem; }
+.expedition-resource-strip small { color: #a9c9c1; font-size: .58rem; }
+.expedition-hud-actions { grid-column: 4 / span 2; display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
+.expedition-hud-action { min-width: 0; padding: 6px 4px; color: #fff0c0; font: inherit; font-size: .68rem; border: 1px solid rgba(255,224,145,.36); border-radius: 10px; background: rgba(29,69,70,.8); }
+.expedition-hud-action span { display: block; font-size: 1rem; }
+
+.expedition-reward-card { position: fixed; z-index: 72; left: 50%; top: 43%; width: min(330px, calc(100vw - 40px)); padding: 20px 22px; text-align: center; color: #fff5d2; border: 1px solid #f5d882; border-radius: 24px; background: radial-gradient(circle at 50% 0, rgba(77,142,121,.94), rgba(8,26,44,.97) 68%); box-shadow: 0 0 0 999px rgba(3,9,22,.14), 0 0 50px rgba(255,220,112,.42); transform: translate(-50%,-50%); pointer-events: none; }
+.expedition-reward-card.is-showing { animation: reward-reveal 3s both; }
+.expedition-reward-card > span { display: block; font-size: 3.2rem; filter: drop-shadow(0 0 12px #ffe38b); }
+.expedition-reward-card small { color: #bde5d6; letter-spacing: .12em; }
+.expedition-reward-card strong { display: block; margin-top: 4px; font-size: 1.35rem; }
+.expedition-reward-card p { margin: 5px 0 0; color: #ffe59c; }
+@keyframes reward-reveal { 0%{opacity:0;transform:translate(-50%,-40%) scale(.72)} 12%,82%{opacity:1;transform:translate(-50%,-50%) scale(1)} 100%{opacity:0;transform:translate(-50%,-54%) scale(1.04)} }
+.expedition-loot-flight-layer { position: fixed; inset: 0; z-index: 76; pointer-events: none; }
+.expedition-loot-flight { position: fixed; left: var(--loot-x); top: var(--loot-y); font-size: 1.5rem; filter: drop-shadow(0 0 7px #fff2a8); animation: loot-to-hud 1.15s cubic-bezier(.2,.75,.18,1) forwards; }
+@keyframes loot-to-hud { 0%{opacity:0;transform:translate(-50%,-50%) scale(.5)} 18%{opacity:1;transform:translate(-50%,-70%) scale(1.35)} 100%{opacity:0;transform:translate(calc(-50% + var(--loot-dx)),calc(-50% + var(--loot-dy))) scale(.4)} }
+
+.expedition-overlay-panel, .expedition-complete-overlay, .town-tutorial { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(3,10,25,.78); backdrop-filter: blur(10px); }
+.expedition-inventory-card, .expedition-complete-card, .town-tutorial-card { position: relative; width: min(620px,100%); max-height: min(760px,88dvh); overflow: auto; padding: clamp(22px,4vw,38px); color: #f9f0d4; border: 1px solid rgba(255,224,142,.45); border-radius: 26px; background: linear-gradient(145deg,#132b3b,#0c182c); box-shadow: 0 24px 70px rgba(0,0,0,.6), inset 0 1px rgba(255,255,255,.1); }
+.expedition-panel-close { position: absolute; right: 14px; top: 12px; width: 38px; height: 38px; color: #fff; font-size: 1.5rem; border: 1px solid rgba(255,255,255,.28); border-radius: 50%; background: rgba(0,0,0,.28); }
+.expedition-bag-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 9px; margin: 20px 0; }
+.expedition-bag-grid article { display: grid; place-items: center; padding: 13px 5px; border: 1px solid rgba(255,223,142,.2); border-radius: 15px; background: rgba(255,255,255,.05); }
+.expedition-bag-grid article span { font-size: 1.7rem; }
+.expedition-bag-grid article strong { color: #ffe49a; font-size: 1.25rem; }
+.expedition-bag-grid article small { color: #b8d7cc; }
+.expedition-key-grid, .expedition-collection-grid { display: grid; gap: 10px; }
+.expedition-key-grid article, .expedition-collection-grid article { display: flex; align-items: center; gap: 15px; padding: 14px; border: 1px solid rgba(255,220,132,.18); border-radius: 16px; background: rgba(255,255,255,.045); }
+.expedition-key-grid article > span, .expedition-collection-grid article > span { display: grid; flex: 0 0 54px; width: 54px; height: 54px; place-items: center; font-size: 1.75rem; border-radius: 14px; background: rgba(113,218,189,.12); }
+.is-unknown > span { color: #6f8292; filter: grayscale(1); }
+.is-unknown { opacity: .72; }
+.expedition-key-grid article div, .expedition-collection-grid article div { display: grid; }
+.expedition-key-grid small, .expedition-collection-grid small, .expedition-collection-grid p { margin: 0; color: #a8c7bf; }
+.expedition-complete-card { text-align: center; overflow: visible; }
+.complete-crown { display: block; font-size: 4.6rem; color: #ffe27f; animation: complete-crown 1.4s ease-in-out infinite alternate; }
+.complete-relics { display: flex; justify-content: center; gap: 12px; margin: 25px 0; }
+.complete-relics span { display: grid; min-width: 90px; padding: 15px 8px; color: #ffe59a; font-size: 2rem; border-radius: 18px; background: rgba(255,255,255,.07); }
+.complete-relics small { color: #ddf2e8; font-size: .7rem; }
+.complete-rays { position: absolute; width: 110vmax; height: 110vmax; background: repeating-conic-gradient(from 0deg,rgba(255,226,126,.12) 0 7deg,transparent 7deg 18deg); animation: complete-rays 14s linear infinite; }
+@keyframes complete-rays { to{transform:rotate(1turn)} }
+@keyframes complete-crown { to{transform:translateY(-8px) scale(1.06);filter:drop-shadow(0 0 14px #ffe176)} }
+
+.town-tutorial-card ol { display: grid; gap: 10px; padding: 0; list-style: none; }
+.town-tutorial-card li { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: rgba(255,255,255,.05); }
+.town-tutorial-card li > span { display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;border-radius:50%;background:#edc66d;color:#17253a;font-weight:800; }
+.town-tutorial-card li div { display:grid; }
+.town-tutorial-card small { color:#b8d5cc; }
+.town-tutorial-guide { color:#ffe07b;font-size:2.6rem;filter:drop-shadow(0 0 10px #ffd358); }
+.next-quest.is-guided { animation: guided-quest 1.15s ease 3; }
+@keyframes guided-quest { 50%{box-shadow:0 0 0 4px rgba(255,226,119,.45),0 0 38px rgba(255,220,106,.8)} }
+
+@media (max-width: 760px) {
+  body[data-view="expedition"] .expedition-hud { left: 3.75rem; right: .45rem; top: max(.42rem,env(safe-area-inset-top)); grid-template-columns: 1.1fr .92fr auto; gap: 4px; padding: 5px; }
+  .expedition-player-card { grid-column: 1; }
+  .rpg-portrait { flex-basis: 40px; width:40px;height:40px; }
+  .expedition-hud .expedition-focus-stat { grid-column:2; }
+  .expedition-hud .expedition-map-stat, .expedition-hud .hud-stat:not(.expedition-focus-stat) { display:none; }
+  .expedition-resource-strip { grid-column: 1 / span 2; }
+  .expedition-resource-strip > span { padding: 3px 5px; grid-template-columns: 15px 1fr; }
+  .expedition-resource-strip i { font-size:.78rem; }
+  .expedition-resource-strip b { font-size:.7rem; }
+  .expedition-resource-strip small { display:none; }
+  .expedition-hud-actions { grid-column:3; grid-row:1 / span 2; grid-template-columns:1fr; }
+  .expedition-hud-action { padding:3px 5px;font-size:.57rem; }
+  .expedition-hud-action span { display:inline;font-size:.72rem; }
+  body[data-view="expedition"] .expedition-mission { top: 7.15rem; }
+  .expedition-reward-card { top:48%; }
+  .expedition-bag-grid { grid-template-columns:repeat(2,1fr); }
+  .complete-relics span { min-width:0;flex:1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expedition-loot-flight { animation-duration:.35s; }
+  .complete-crown, .complete-rays, .next-quest.is-guided { animation:none; }
+}

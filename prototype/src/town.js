@@ -10,6 +10,7 @@ export const EXPEDITION_FOCUS_RESTORE = 6;
 export const EXPEDITION_FOCUS_MOONLEAF_COST = 1;
 export const COMMISSION_MOONLEAF_COST = 3;
 export const MINIMUM_DAILY_WISHES_FOR_REST = 2;
+const TOWN_TUTORIAL_KEY = "starcare-town-tutorial-v1";
 
 export const RESOURCE_LABELS = {
   coins: "星幣",
@@ -674,7 +675,9 @@ export function createTownController({ root = document, storage = globalThis.loc
     collectionGrid: element("#town-collection-grid"),
     collectionCount: element("#town-collection-count"),
     saveStatus: element("#save-status"),
-    lifetime: element("#town-lifetime")
+    lifetime: element("#town-lifetime"),
+    tutorial: element("#town-tutorial"),
+    tutorialStart: element("#town-tutorial-start")
   };
   let townPanelOpener = null;
 
@@ -723,6 +726,27 @@ export function createTownController({ root = document, storage = globalThis.loc
     const saved = saveTownState(state, storage);
     if (ui.saveStatus) ui.saveStatus.textContent = saved ? "✓ 已自動儲存" : "⚠ 無法寫入本機存檔";
     return saved;
+  }
+
+  function tutorialSeen() {
+    try { return storage?.getItem(TOWN_TUTORIAL_KEY) === "seen"; }
+    catch { return false; }
+  }
+
+  function setTutorialOpen(open) {
+    if (!ui.tutorial) return;
+    ui.tutorial.hidden = !open;
+    ui.townView?.classList.toggle("has-tutorial", open);
+    if (open) window.setTimeout(() => ui.tutorialStart?.focus({ preventScroll: true }), 0);
+  }
+
+  function beginTownGuidance() {
+    try { storage?.setItem(TOWN_TUTORIAL_KEY, "seen"); } catch {}
+    setTutorialOpen(false);
+    ui.nextQuest?.classList.add("is-guided");
+    ui.nextQuest?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => ui.nextQuestAction?.focus({ preventScroll: true }), 420);
+    notify("第一步已亮起：跟著金色任務卡，就知道現在要去哪裡、會得到什麼。", 2600);
   }
 
   function commit(result) {
@@ -890,11 +914,13 @@ export function createTownController({ root = document, storage = globalThis.loc
   ui.closeWishes?.addEventListener("click", () => closeTownPanels({ restoreFocus: true }));
   ui.collectionButton?.addEventListener("click", () => openCollection(ui.collectionButton));
   ui.closeCollection?.addEventListener("click", () => closeTownPanels({ restoreFocus: true }));
+  ui.tutorialStart?.addEventListener("click", beginTownGuidance);
   root.addEventListener?.("keydown", (event) => {
     if (event.key === "Escape" && ui.townView?.classList.contains("has-dialog")) closeTownPanels({ restoreFocus: true });
   });
 
   render();
+  if (!tutorialSeen()) setTutorialOpen(true);
   if (ui.saveStatus) ui.saveStatus.textContent = state.updatedAt ? "✓ 已載入本機進度" : "✓ 新存檔已建立";
 
   return {

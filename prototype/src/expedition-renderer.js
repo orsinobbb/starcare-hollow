@@ -17,11 +17,10 @@ const FIXED_STEP_SECONDS = 1 / 60;
 const DIG_BEACON_HIT_RADIUS = 0.38;
 const WALKABLE_RADIUS = 0.82;
 const EXCAVATION_TIMELINE = {
-  walk: 0.42,
   aim: 0.22,
   impact: 0.18,
   reveal: 0.36,
-  reward: 0.56,
+  reward: 3,
   settle: 0.28,
   discovery: 0.68
 };
@@ -75,11 +74,9 @@ export class ExpeditionRenderer {
     this.doorTransition = null;
     this.minerTile = { x: 0, y: 0 };
     this.movement = null;
-    this.pendingMove = null;
     this.minerFacing = 1;
     this.lastFootstep = 0;
     this.reaction = null;
-    this.queuedTile = null;
     this.shake = { x: 0, y: 0, energy: 0 };
     this.running = false;
     this.frameHandle = null;
@@ -119,18 +116,10 @@ export class ExpeditionRenderer {
       this.camera.vy = 0;
       this.minerTile = { x: 0, y: 0 };
       this.movement = null;
-      this.pendingMove = null;
       this.keyboardTile = { x: 1, y: 0 };
     }
     if (!isInBounds(state, this.keyboardTile.x, this.keyboardTile.y)) this.keyboardTile = { x: 0, y: 0 };
     this.constrainCamera();
-    this.render();
-  }
-
-  setQueuedTile(tile) {
-    this.queuedTile = tile && this.state && isInBounds(this.state, tile.x, tile.y)
-      ? { x: tile.x, y: tile.y }
-      : null;
     this.render();
   }
 
@@ -230,14 +219,17 @@ export class ExpeditionRenderer {
     this.shake.y = (Math.random() * 2 - 1) * this.shake.energy * 0.62;
   }
 
-  timelineFor(event) {
+  timelineFor(event, origin, tile) {
     const multiplier = this.reducedMotion ? 0.52 : 1;
+    const distance = Math.hypot(tile.x - origin.x, tile.y - origin.y);
     const timeline = {
-      walk: EXCAVATION_TIMELINE.walk * multiplier,
+      walk: this.reducedMotion ? 0.2 : clamp(distance * 0.34, 0.5, 2.6),
       aim: EXCAVATION_TIMELINE.aim * multiplier,
       impact: EXCAVATION_TIMELINE.impact * multiplier,
       reveal: EXCAVATION_TIMELINE.reveal * multiplier,
-      reward: EXCAVATION_TIMELINE.reward * multiplier,
+      // The result is a gameplay message, not decorative motion. Keep it
+      // readable for three seconds even when reduced motion is requested.
+      reward: EXCAVATION_TIMELINE.reward,
       settle: EXCAVATION_TIMELINE.settle * multiplier,
       discovery: ["discovery", "key"].includes(event.type) ? EXCAVATION_TIMELINE.discovery * multiplier : 0
     };
@@ -326,12 +318,7 @@ export class ExpeditionRenderer {
     this.minerTile = { ...animation.tile };
     this.excavation = null;
     this.shake = { x: 0, y: 0, energy: 0 };
-    const destination = this.pendingMove;
-    this.pendingMove = null;
     animation.resolve?.();
-    if (destination) queueMicrotask(() => {
-      if (!this.excavation && !this.movement) this.startMovement(destination);
-    });
   }
 
   spawnBurst(tile, terrain, count, shape) {
@@ -468,11 +455,12 @@ export class ExpeditionRenderer {
     return { ...this.minerTile };
   }
 
-  startMovement(destination) {
+  startMovement(destination, stage = "walk") {
     const origin = this.currentMinerPosition();
     const distance = Math.hypot(destination.x - origin.x, destination.y - origin.y);
     if (distance < 0.06) {
       this.minerTile = { ...destination };
+      this.onMove({ stage: "arrive", destination: { ...destination } });
       return;
     }
     if (Math.abs(destination.x - origin.x) > 0.04) this.minerFacing = destination.x >= origin.x ? 1 : -1;
@@ -480,22 +468,22 @@ export class ExpeditionRenderer {
       origin,
       destination: { ...destination },
       elapsed: 0,
-      duration: this.reducedMotion ? 0.16 : clamp(distance * 0.19, 0.24, 1.25)
+      duration: this.reducedMotion ? 0.22 : clamp(distance * 0.34, 0.45, 2.4)
     };
     this.reaction = null;
     this.lastFootstep = -0.18;
-    this.onMove({ stage: "walk", destination: { ...destination } });
+    this.onMove({ stage, destination: { ...destination } });
   }
 
   requestMovement(destination) {
     const walkable = this.walkableDestination(destination);
     if (this.excavation) {
-      this.pendingMove = walkable;
-      this.onMove({ stage: "queued", destination: { ...walkable } });
-      return;
+      this.onMove({ stage: "locked", destination: { ...walkable } });
+      return false;
     }
-    this.pendingMove = null;
-    this.startMovement(walkable);
+    const rerouting = Boolean(this.movement);
+    this.startMovement(walkable, rerouting ? "reroute" : "walk");
+    return true;
   }
 
   playReaction(type = "blocked") {
@@ -512,6 +500,15 @@ export class ExpeditionRenderer {
     return {
       x: this.width / 2 + (x + drift.x - this.camera.x) * this.tileSize,
       y: this.height / 2 + (y + drift.y - this.camera.y) * this.tileSize
+    };
+  }
+
+  tileClientPosition(x, y) {
+    const point = this.tileToScreen(x, y);
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      x: rect.left + point.x * (rect.width / Math.max(1, this.width)),
+      y: rect.top + point.y * (rect.height / Math.max(1, this.height))
     };
   }
 
@@ -649,9 +646,8 @@ export class ExpeditionRenderer {
     if (this.excavation) return Promise.resolve();
     const origin = this.currentMinerPosition();
     this.movement = null;
-    this.pendingMove = null;
     if (Math.abs(tile.x - origin.x) > 0.04) this.minerFacing = tile.x >= origin.x ? 1 : -1;
-    const timeline = this.timelineFor(event);
+    const timeline = this.timelineFor(event, origin, tile);
     return new Promise((resolve) => {
       this.excavation = {
         tile,
@@ -685,7 +681,6 @@ export class ExpeditionRenderer {
     const duration = this.reducedMotion ? 460 : 920;
     const origin = this.currentMinerPosition();
     this.movement = null;
-    this.pendingMove = null;
     if (Math.abs(tile.x - origin.x) > 0.04) this.minerFacing = tile.x >= origin.x ? 1 : -1;
     return new Promise((resolve) => {
       this.doorTransition = { tile: { ...tile }, origin, event, startedAt: performance.now(), duration };
@@ -1174,7 +1169,6 @@ export class ExpeditionRenderer {
 
     const animation = this.activeExcavationAt(x, y);
     if (animation) this.drawExcavationOverlay(context, animation, left, top, size, Math.max(8, size * 0.18));
-    if (this.queuedTile?.x === x && this.queuedTile?.y === y) this.drawQueuedMarker(context, left, top, size, Math.max(8, size * 0.18));
   }
 
   drawDoor(context, door, x, y, size, unlocked) {
@@ -1365,30 +1359,8 @@ export class ExpeditionRenderer {
     }
   }
 
-  drawQueuedMarker(context, left, top, size, radius) {
-    const pulse = 0.5 + Math.sin(performance.now() / 180) * 0.14;
-    const centerX = left + size / 2;
-    const centerY = top + size / 2;
-    context.save();
-    context.globalAlpha = pulse;
-    context.setLineDash([Math.max(3, size * 0.09), Math.max(2, size * 0.06)]);
-    context.strokeStyle = "#fff0a5";
-    context.lineWidth = Math.max(1.5, size * 0.04);
-    context.beginPath();
-    context.arc(centerX, centerY, size * 0.38, 0, Math.PI * 2);
-    context.stroke();
-    context.setLineDash([]);
-    context.globalAlpha = 0.94;
-    context.fillStyle = "#fff7cf";
-    context.font = `bold ${Math.max(9, size * 0.16)}px system-ui, sans-serif`;
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillText("下一鏟", centerX, top - Math.max(8, size * 0.1));
-    context.restore();
-  }
-
   drawMovementTarget(context) {
-    const destination = this.pendingMove ?? this.movement?.destination;
+    const destination = this.movement?.destination;
     if (!destination) return;
     const screen = this.tileToScreen(destination.x, destination.y);
     const pulse = 0.72 + Math.sin(performance.now() / 170) * 0.16;

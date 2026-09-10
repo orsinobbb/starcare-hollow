@@ -9,6 +9,7 @@ import {
   enterDoor,
   excavate,
   isInBounds,
+  isRevealed,
   recoverExpeditionFocus,
   regionAt,
   terrainAt,
@@ -43,8 +44,6 @@ export function createExpeditionController({ root = document, townController, on
   let state = townController.snapshot().expedition ?? createExpeditionState();
   let selectedTile = { x: 1, y: 0 };
   let isAnimating = false;
-  let queuedTile = null;
-  let queuedDoor = null;
   let recoveryTimer = null;
   const currentRunByMap = new Map();
   const ui = {
@@ -79,7 +78,32 @@ export function createExpeditionController({ root = document, townController, on
     stepDoor: element("#expedition-step-door"),
     tutorial: element("#expedition-tutorial"),
     tutorialStart: element("#expedition-tutorial-start"),
-    help: element("#expedition-help")
+    help: element("#expedition-help"),
+    playerLevel: element("#expedition-player-level"),
+    playerXpBar: element("#expedition-player-xp-bar"),
+    playerFocusBar: element("#expedition-player-focus-bar"),
+    resourceCoins: element("#expedition-resource-coins b"),
+    resourceMoonleaf: element("#expedition-resource-moonleaf b"),
+    resourceTimber: element("#expedition-resource-timber b"),
+    resourceStarlight: element("#expedition-resource-starlight b"),
+    openBag: element("#expedition-open-bag"),
+    bagPanel: element("#expedition-bag-panel"),
+    closeBag: element("#expedition-close-bag"),
+    bagGrid: element("#expedition-bag-grid"),
+    keyGrid: element("#expedition-key-grid"),
+    openCollection: element("#expedition-open-collection"),
+    collectionPanel: element("#expedition-collection-panel"),
+    closeCollection: element("#expedition-close-collection"),
+    collectionSummary: element("#expedition-collection-summary"),
+    collectionGrid: element("#expedition-collection-grid"),
+    rewardCard: element("#expedition-reward-card"),
+    rewardIcon: element("#expedition-reward-icon"),
+    rewardTitle: element("#expedition-reward-title"),
+    rewardDetail: element("#expedition-reward-detail"),
+    lootLayer: element("#expedition-loot-flight-layer"),
+    completeOverlay: element("#expedition-complete-overlay"),
+    completeRelics: element("#expedition-complete-relics"),
+    completeClose: element("#expedition-complete-close")
   };
 
   const renderer = new ExpeditionRenderer(canvas, {
@@ -89,16 +113,28 @@ export function createExpeditionController({ root = document, townController, on
       selectedTile = tile;
       renderSelection();
     },
-    onMove: ({ stage }) => {
-      const copy = {
-        walk: ["♟", "她正走向你指定的位置；途中仍可改目的地，或點亮起的星標開始挖掘。"],
-        queued: ["◎", "移動位置已記住；這一鏟的成果完整顯現後，她就會出發。"],
-        arrive: ["✦", "已到達指定位置。點空地可繼續走，點亮起的星標可開始挖掘。"]
-      };
-      const [icon, text] = copy[stage] ?? ["♟", "挖礦者正在移動。"];
+    onMove: ({ stage, destination }) => {
+      let [icon, text] = {
+        walk: ["♟", "正前往指定位置；移動途中點別處，可以立即改道。"],
+        reroute: ["↝", "收到新指令，已轉向新的目的地。"],
+        locked: ["⛏", "正在挖掘，現在不能移動。成果收入背包後即可繼續。"]
+      }[stage] ?? ["♟", "挖礦者正在移動。"];
+      if (stage === "arrive" && destination) {
+        const x = clamp(Math.round(destination.x), 0, state.width - 1);
+        const y = clamp(Math.round(destination.y), 0, state.height - 1);
+        selectedTile = { x, y };
+        const revealed = isRevealed(state, x, y);
+        const permission = canExcavate(state, x, y);
+        [icon, text] = revealed
+          ? ["✓", `已抵達${locationNameFor(x, y)}：這裡已挖掘，地貌已保存，不必重挖。`]
+          : permission.ok
+          ? ["✦", `已抵達${locationNameFor(x, y)}：這裡尚未挖掘，點發光星標開始落鏟。`]
+          : ["◎", `已抵達${locationNameFor(x, y)}；請尋找鄰近的發光星標。`];
+        renderSelection();
+      }
       updateStage(stage, icon, text);
     },
-    onStage: ({ stage, event }) => {
+    onStage: ({ stage, event, tile }) => {
       const stageCopy = {
         walk: ["♟", "挖礦者正走向標記地點。"],
         aim: ["⌁", "先讓鏟尖定位，準備翻開眼前的地貌。"],
@@ -112,6 +148,8 @@ export function createExpeditionController({ root = document, townController, on
       };
       const [icon, text] = stageCopy[stage] ?? ["⌁", "遠征進行中。"];
       updateStage(stage, icon, text);
+      if (stage === "reward") showReward(event, tile);
+      if (stage === "settle") hideReward();
     }
   });
 
@@ -119,6 +157,93 @@ export function createExpeditionController({ root = document, townController, on
     if (!ui.stage) return;
     ui.stage.dataset.stage = stage;
     ui.stage.innerHTML = `<span aria-hidden="true">${icon}</span><p>${text}</p>`;
+  }
+
+  const resourceMeta = {
+    coins: { icon: "✦", label: "星幣" },
+    moonleaf: { icon: "🌿", label: "月芽葉" },
+    timber: { icon: "▰", label: "暖木" },
+    starlight: { icon: "✧", label: "星光" }
+  };
+
+  function setOverlay(panel, open, focusTarget) {
+    if (!panel) return;
+    panel.hidden = !open;
+    if (open) window.setTimeout(() => focusTarget?.focus({ preventScroll: true }), 0);
+    else canvas.focus({ preventScroll: true });
+  }
+
+  function renderBag(town = townController.snapshot()) {
+    if (ui.bagGrid) ui.bagGrid.innerHTML = Object.entries(resourceMeta).map(([id, meta]) => `
+      <article data-resource="${id}"><span aria-hidden="true">${meta.icon}</span><strong>${town.resources[id] ?? 0}</strong><small>${meta.label}</small></article>
+    `).join("");
+    if (ui.keyGrid) {
+      const keys = Object.values(EXPEDITION_MAPS).map((map) => map.key).filter(Boolean);
+      ui.keyGrid.innerHTML = keys.map((key) => {
+        const found = state.collectedKeyIds.includes(key.id);
+        return `<article class="${found ? "is-found" : "is-unknown"}"><span aria-hidden="true">${found ? key.icon : "?"}</span><div><strong>${found ? key.name : "尚未發現的鑰匙"}</strong><small>${found ? "永久持有，不會消耗" : "在礦層中繼續探索"}</small></div></article>`;
+      }).join("");
+    }
+  }
+
+  function renderCollection() {
+    const found = new Set(state.foundTargetIds);
+    if (ui.collectionSummary) ui.collectionSummary.textContent = `已找到 ${found.size} / ${state.targets.length} 件主要寶物`;
+    if (ui.collectionGrid) ui.collectionGrid.innerHTML = state.targets.map((target, index) => {
+      const collected = found.has(target.id);
+      return `<article class="${collected ? "is-found" : "is-unknown"}"><span aria-hidden="true">${collected ? target.icon : "?"}</span><div><small>寶物 ${index + 1}</small><strong>${collected ? target.name : "未知寶物"}</strong><p>${collected ? "已永久收入星脈寶物簿" : "輪廓仍被星霧遮住"}</p></div></article>`;
+    }).join("");
+  }
+
+  function flyLoot(icon, tile, target) {
+    if (!ui.lootLayer || !tile || !target) return;
+    const from = renderer.tileClientPosition(tile.x, tile.y);
+    const rect = target.getBoundingClientRect();
+    const loot = document.createElement("span");
+    loot.className = "expedition-loot-flight";
+    loot.textContent = icon;
+    loot.style.setProperty("--loot-x", `${from.x}px`);
+    loot.style.setProperty("--loot-y", `${from.y}px`);
+    loot.style.setProperty("--loot-dx", `${rect.left + rect.width / 2 - from.x}px`);
+    loot.style.setProperty("--loot-dy", `${rect.top + rect.height / 2 - from.y}px`);
+    ui.lootLayer.append(loot);
+    loot.addEventListener("animationend", () => loot.remove(), { once: true });
+  }
+
+  function showReward(event, tile) {
+    if (!ui.rewardCard || ui.rewardCard.dataset.eventId === `${state.digs}:${tile?.x}:${tile?.y}`) return;
+    ui.rewardCard.dataset.eventId = `${state.digs}:${tile?.x}:${tile?.y}`;
+    const special = event.type === "discovery" ? event.discovery : event.type === "key" ? event.key : null;
+    ui.rewardIcon.textContent = special?.icon ?? event.terrain.symbol ?? "✦";
+    ui.rewardTitle.textContent = special ? `發現 ${special.name}` : `挖出 ${event.terrain.name}`;
+    ui.rewardDetail.textContent = `${formatReward(event.reward)} · 將自動收入背包`;
+    ui.rewardCard.hidden = false;
+    ui.rewardCard.classList.remove("is-showing");
+    void ui.rewardCard.offsetWidth;
+    ui.rewardCard.classList.add("is-showing");
+    window.setTimeout(() => {
+      if (special) flyLoot(special.icon, tile, event.type === "discovery" ? ui.openCollection : ui.openBag);
+      for (const [resource, amount] of Object.entries(event.reward ?? {})) {
+        const target = element(`#expedition-resource-${resource}`) ?? ui.openBag;
+        const meta = resourceMeta[resource] ?? { icon: "+" };
+        for (let index = 0; index < Math.min(3, amount); index += 1) {
+          window.setTimeout(() => flyLoot(meta.icon, tile, target), index * 110);
+        }
+      }
+    }, 1450);
+  }
+
+  function hideReward() {
+    if (!ui.rewardCard) return;
+    ui.rewardCard.hidden = true;
+    ui.rewardCard.classList.remove("is-showing");
+    delete ui.rewardCard.dataset.eventId;
+  }
+
+  function showCollectionComplete() {
+    if (!ui.completeOverlay) return;
+    ui.completeRelics.innerHTML = state.targets.map((target) => `<span>${target.icon}<small>${target.name}</small></span>`).join("");
+    setOverlay(ui.completeOverlay, true, ui.completeClose);
   }
 
   function selectedTerrain() {
@@ -197,16 +322,13 @@ export function createExpeditionController({ root = document, townController, on
     const focusRecovery = recoverExpeditionFocus(state);
     const location = locationNameFor(selectedTile.x, selectedTile.y);
     if (ui.selected) ui.selected.textContent = door ? `${activeMap(state).name} · ${door.name}` : location;
-    const queued = queuedTile && queuedTile.x === selectedTile.x && queuedTile.y === selectedTile.y;
     if (ui.selectedDetail) {
       ui.selectedDetail.textContent = door
         ? doorPermission.ok
           ? `石門已可開啟；進入後，本層進度與鑰匙都會永久保留。`
           : doorPermission.message
         : isAnimating
-        ? queued
-          ? `${location} 已標記為下一鏟；目前這一鏟的獎勵正在完整顯現。`
-          : `正在翻開地貌；現在可輕觸另一個可達星標，預約下一鏟。`
+        ? `鏟尖已落下，現在不能移動或改挖別處；成果收入背包後即可繼續。`
         : permission.ok
         ? `${terrain.name}地貌 · 踏查消耗 ${terrain.cost} 專注`
         : permission.reason === "focus"
@@ -214,24 +336,18 @@ export function createExpeditionController({ root = document, townController, on
         : permission.message;
     }
     if (ui.queue) {
-      ui.queue.textContent = queuedTile
-        ? `下一鏟：${locationNameFor(queuedTile.x, queuedTile.y)}（可改選另一個可達星標）`
-        : isAnimating
-        ? "下一鏟：現在可標記一個可達星標"
-        : "下一鏟：尚未標記";
+      ui.queue.textContent = isAnimating
+        ? "目前狀態：挖掘鎖定 · 三秒成果入袋後恢復操作"
+        : "移動規則：走路途中點別處會立即改道；抵達後再決定是否挖掘";
     }
     if (ui.dig) {
-      ui.dig.disabled = door ? !doorPermission.ok : !permission.ok;
+      ui.dig.disabled = isAnimating || (door ? !doorPermission.ok : !permission.ok);
       ui.dig.textContent = door
         ? doorPermission.ok
-          ? isAnimating
-            ? queuedDoor ? `已預約開啟${door.name}` : `成果顯現後開啟${door.name}`
-            : `開啟${door.name}`
+          ? isAnimating ? `挖掘中，暫時不能開門` : `開啟${door.name}`
           : `需要鑰匙才能開門`
         : isAnimating
-        ? permission.ok
-          ? queued ? `已預約下一鏟：${terrain.name}` : `預約挖掘「${terrain.name}」（-${terrain.cost} 專注）`
-          : "這裡目前還不能前往"
+        ? "⛏ 挖掘中 · 等待成果收入背包"
         : permission.ok
         ? `⛏ 挖掘「${location.split(" · ")[1]}」（-${terrain.cost} 專注）`
         : "這裡目前還不能踏查";
@@ -372,8 +488,17 @@ export function createExpeditionController({ root = document, townController, on
 
   function render() {
     const recovery = synchronizePassiveFocus();
+    const town = townController.snapshot();
     const found = state.foundTargetIds.length;
     if (ui.focus) ui.focus.textContent = `${state.focus} / ${EXPEDITION_FOCUS_MAX}`;
+    if (ui.playerFocusBar) ui.playerFocusBar.style.width = `${(state.focus / EXPEDITION_FOCUS_MAX) * 100}%`;
+    const level = 1 + Math.floor(state.digs / 6);
+    if (ui.playerLevel) ui.playerLevel.textContent = `Lv.${level}`;
+    if (ui.playerXpBar) ui.playerXpBar.style.width = `${((state.digs % 6) / 6) * 100}%`;
+    if (ui.resourceCoins) ui.resourceCoins.textContent = town.resources.coins.toLocaleString("zh-Hant");
+    if (ui.resourceMoonleaf) ui.resourceMoonleaf.textContent = town.resources.moonleaf;
+    if (ui.resourceTimber) ui.resourceTimber.textContent = town.resources.timber;
+    if (ui.resourceStarlight) ui.resourceStarlight.textContent = town.resources.starlight;
     renderRecovery(recovery);
     if (ui.relics) ui.relics.textContent = `${found} / ${state.targets.length}`;
     const map = activeMap(state);
@@ -397,6 +522,8 @@ export function createExpeditionController({ root = document, townController, on
     }
     renderSelection();
     renderSupply(recovery);
+    renderBag(town);
+    renderCollection();
   }
 
   function resupplyFocus() {
@@ -415,25 +542,13 @@ export function createExpeditionController({ root = document, townController, on
     return result;
   }
 
-  function queueExcavation(x, y) {
-    synchronizePassiveFocus();
-    const permission = canExcavate(state, x, y);
-    if (!permission.ok) {
-      renderer.playReaction(permission.reason);
-      const message = permission.reason === "focus"
-        ? `${permission.message} ${countdownText(recoverExpeditionFocus(state).remainingMs)} 後自然回復 +1。`
-        : permission.message;
-      if (ui.log) ui.log.textContent = message;
-      onNotify(message);
-      return { ok: false, state, message, event: null };
-    }
-    queuedTile = { x, y };
-    selectedTile = { x, y };
-    renderer.setQueuedTile(queuedTile);
-    updateStage("queued", "⌁", `下一鏟已標記：${locationNameFor(x, y)}。目前成果完整顯現後會立刻出發。`);
-    if (ui.log) ui.log.textContent = `下一鏟已預約至${locationNameFor(x, y)}。`;
-    renderSelection();
-    return { ok: true, state, message: "下一鏟已標記。", event: null, queued: true };
+  function rejectDuringExcavation() {
+    const message = "鏟尖已落下，現在不能移動或改挖別處；三秒成果收入背包後即可繼續。";
+    renderer.playReaction("blocked");
+    updateStage("locked", "⛏", message);
+    if (ui.log) ui.log.textContent = message;
+    onNotify(message, 1800);
+    return { ok: false, state, message, event: null };
   }
 
   async function beginExcavation(x, y) {
@@ -452,7 +567,6 @@ export function createExpeditionController({ root = document, townController, on
     currentRunByMap.get(state.activeMapId).add(tileKey(x, y));
     selectedTile = { x, y };
     renderer.setState(renderedState());
-    renderer.setQueuedTile(queuedTile);
     renderSelection();
     updateStage("aim", "⌁", "鏟尖正在定位；這次翻開會先呈現完整的地層反應。");
     if (ui.log) ui.log.textContent = `挖礦者正前往${locationNameFor(x, y)}…`;
@@ -472,18 +586,7 @@ export function createExpeditionController({ root = document, townController, on
     onNotify(result.event.completed
       ? "星砂群島的主要寶物已全數找回；地圖與收藏都會永久保留。"
       : result.message, result.event.type === "discovery" ? 3200 : 1800);
-
-    const nextTile = queuedTile;
-    queuedTile = null;
-    renderer.setQueuedTile(null);
-    const nextDoor = queuedDoor;
-    queuedDoor = null;
-    if (nextDoor) return requestDoor(nextDoor.x, nextDoor.y);
-    if (nextTile) {
-      const permission = canExcavate(state, nextTile.x, nextTile.y);
-      if (permission.ok) return beginExcavation(nextTile.x, nextTile.y);
-      onNotify(`下一鏟的路徑已改變：${permission.message}`);
-    }
+    if (result.event.completed) showCollectionComplete();
     const upcoming = nextPlayableTarget();
     if (upcoming) {
       selectedTile = { x: upcoming.x, y: upcoming.y };
@@ -495,27 +598,12 @@ export function createExpeditionController({ root = document, townController, on
 
   function requestExcavate(x, y) {
     synchronizePassiveFocus();
-    if (isAnimating) return queueExcavation(x, y);
+    if (isAnimating) return rejectDuringExcavation();
     return beginExcavation(x, y);
   }
 
   async function requestDoor(x, y) {
-    if (isAnimating) {
-      const permission = canEnterDoor(state, x, y);
-      if (!permission.ok) {
-        onNotify(permission.message);
-        return { ok: false, state, message: permission.message };
-      }
-      queuedDoor = { x, y };
-      queuedTile = null;
-      renderer.setQueuedTile(null);
-      selectedTile = { x, y };
-      updateStage("queued", "門", `${doorAt(state, x, y).name}已排入下一步；成果顯現後會自動開門。`);
-      if (ui.log) ui.log.textContent = "不必再點一次：目前演出結束後會自動通過石門。";
-      renderSelection();
-      onNotify("已預約開門；目前成果顯現後會自動前往下一層。");
-      return { ok: true, state, message: "已預約開門。", queued: true };
-    }
+    if (isAnimating) return rejectDuringExcavation();
     const result = enterDoor(state, x, y);
     if (!result.ok) {
       renderer.playReaction(result.reason);
@@ -530,9 +618,6 @@ export function createExpeditionController({ root = document, townController, on
     const townResult = townController.recordExpedition(result.state, { ...result.event, message: result.message });
     state = townResult.state.expedition;
     selectedTile = { ...activeMap(state).entry };
-    queuedTile = null;
-    queuedDoor = null;
-    renderer.setQueuedTile(null);
     isAnimating = false;
     renderer.setState(renderedState());
     render();
@@ -563,6 +648,23 @@ export function createExpeditionController({ root = document, townController, on
   ui.closeSupply?.addEventListener("click", () => setSupplyOpen(false));
   ui.help?.addEventListener("click", () => setTutorialOpen(true));
   ui.tutorialStart?.addEventListener("click", beginGuidedPlay);
+  ui.openBag?.addEventListener("click", () => {
+    renderBag();
+    setOverlay(ui.bagPanel, true, ui.closeBag);
+  });
+  ui.closeBag?.addEventListener("click", () => setOverlay(ui.bagPanel, false));
+  ui.openCollection?.addEventListener("click", () => {
+    renderCollection();
+    setOverlay(ui.collectionPanel, true, ui.closeCollection);
+  });
+  ui.closeCollection?.addEventListener("click", () => setOverlay(ui.collectionPanel, false));
+  ui.completeClose?.addEventListener("click", () => setOverlay(ui.completeOverlay, false));
+  root.addEventListener?.("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (!ui.completeOverlay?.hidden) setOverlay(ui.completeOverlay, false);
+    else if (!ui.collectionPanel?.hidden) setOverlay(ui.collectionPanel, false);
+    else if (!ui.bagPanel?.hidden) setOverlay(ui.bagPanel, false);
+  });
   element("#expedition-map-controls")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-expedition-move]");
     if (!button) return;

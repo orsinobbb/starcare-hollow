@@ -9,7 +9,7 @@
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.12.3" />
+    <link rel="stylesheet" href="./styles.css?v=0.13.0" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.12.3</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.13.0</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -72,9 +72,14 @@
         </div>
 
         <div id="expedition-hud" class="hud expedition-hud" aria-label="星脈遠征狀態" hidden>
+          <div class="expedition-player-card" aria-label="主角狀態">
+            <span class="rpg-portrait" aria-hidden="true"><i class="portrait-hair"></i><i class="portrait-face"></i><i class="portrait-coat"></i><i class="portrait-star">✦</i></span>
+            <span class="player-copy"><small>挖礦師</small><strong>璃芽 <b id="expedition-player-level">Lv.1</b></strong><span class="player-xp"><i id="expedition-player-xp-bar"></i></span></span>
+          </div>
           <div class="hud-stat expedition-focus-stat">
             <span class="hud-label">遠征專注</span>
             <strong id="expedition-focus">30 / 30</strong>
+            <span class="focus-meter" aria-hidden="true"><i id="expedition-player-focus-bar"></i></span>
             <small id="expedition-recovery" class="expedition-recovery">專注充足</small>
           </div>
           <div class="hud-stat expedition-map-stat">
@@ -90,7 +95,17 @@
             <span class="hud-label">探索進度</span>
             <strong id="expedition-progress">已調查 1 格</strong>
           </div>
-          <button id="expedition-open-supply" class="expedition-hud-action" type="button" aria-haspopup="dialog">補給</button>
+          <div class="expedition-resource-strip" aria-label="攜帶資源">
+            <span id="expedition-resource-coins" data-resource="coins"><i>✦</i><b>0</b><small>星幣</small></span>
+            <span id="expedition-resource-moonleaf" data-resource="moonleaf"><i>🌿</i><b>0</b><small>月芽</small></span>
+            <span id="expedition-resource-timber" data-resource="timber"><i>▰</i><b>0</b><small>暖木</small></span>
+            <span id="expedition-resource-starlight" data-resource="starlight"><i>✧</i><b>0</b><small>星光</small></span>
+          </div>
+          <div class="expedition-hud-actions">
+            <button id="expedition-open-bag" class="expedition-hud-action" type="button" aria-haspopup="dialog"><span aria-hidden="true">🎒</span>背包</button>
+            <button id="expedition-open-collection" class="expedition-hud-action" type="button" aria-haspopup="dialog"><span aria-hidden="true">📖</span>寶物簿</button>
+            <button id="expedition-open-supply" class="expedition-hud-action" type="button" aria-haspopup="dialog">補給</button>
+          </div>
         </div>
 
         <nav id="clinic-controls" class="header-actions" aria-label="遊戲控制" hidden>
@@ -111,6 +126,20 @@
 
       <main id="main-content">
         <section id="town-view" class="town-view" aria-labelledby="town-title">
+          <section id="town-tutorial" class="town-tutorial" role="dialog" aria-modal="true" aria-labelledby="town-tutorial-title" hidden>
+            <div class="town-tutorial-card">
+              <span class="town-tutorial-guide" aria-hidden="true">✦</span>
+              <p class="eyebrow">歡迎來到暖燈坡</p>
+              <h2 id="town-tutorial-title">先讓第一盞燈亮起</h2>
+              <p>我是繁花。這座小鎮的每一個遊戲都會回到同一段成長：取得資源、遠征尋寶、完成居民心願，再把街區一點一點修復。</p>
+              <ol>
+                <li><span>1</span><div><strong>先採收月芽葉</strong><small>它能補充遠征專注，也會用於居民委託。</small></div></li>
+                <li><span>2</span><div><strong>前往穹星礦場</strong><small>挖到鑰匙、開門並把寶物帶回小鎮。</small></div></li>
+                <li><span>3</span><div><strong>完成星願</strong><small>資源會消耗，收藏與小鎮進度會永久保留。</small></div></li>
+              </ol>
+              <button id="town-tutorial-start" class="primary-button" type="button">好，帶我去第一步</button>
+            </div>
+          </section>
           <section class="town-hero">
             <div class="town-sky" aria-hidden="true">
               <span class="sky-moon"></span>
@@ -205,7 +234,7 @@
                     <strong>星脈遠征</strong>
                     <span class="level-chip">挖寶</span>
                   </div>
-                  <p class="building-purpose">選一格 → 挖礦者走過去 → 挖出材料或遺物。可先標記下一鏟。</p>
+                  <p class="building-purpose">點一格 → 挖礦者走過去 → 抵達後確認地貌並挖出材料或遺物。移動途中可隨時改道。</p>
                   <p class="building-benefit">每格都有材料；遺物是額外收藏與大獎。</p>
                   <div class="building-actions">
                     <button id="expedition-building-action" class="primary-button compact" type="button">帶挖礦者出發</button>
@@ -351,11 +380,19 @@
                 <span class="map-status-chip">自動儲存</span>
               </div>
               <canvas id="expedition-canvas" tabindex="0" aria-label="穹星礦場踏查地圖" aria-describedby="expedition-map-help"></canvas>
+              <div id="expedition-reward-card" class="expedition-reward-card" role="status" aria-live="assertive" hidden>
+                <span id="expedition-reward-icon" aria-hidden="true">✦</span>
+                <small>本次挖掘成果</small>
+                <strong id="expedition-reward-title">星砂</strong>
+                <p id="expedition-reward-detail">星幣 +4</p>
+                <em>正在收入背包…</em>
+              </div>
+              <div id="expedition-loot-flight-layer" class="expedition-loot-flight-layer" aria-hidden="true"></div>
               <div id="expedition-stage" class="expedition-stage" data-stage="ready" role="status" aria-live="polite">
                 <span aria-hidden="true">⌁</span>
                 <p>挖礦者會前往星標、落鏟、翻開地貌，再把每處成果清楚交到你手上。</p>
               </div>
-              <p id="expedition-map-help" class="expedition-map-help"><strong>直接指揮她：</strong>輕觸空地，她會走到指定位置；途中可再點別處改道。輕觸亮起的星標，她會前往、落鏟、清土並親手收下成果。作業中仍可預約下一鏟或下一個移動點。單指拖曳用來查看遠方地貌；世界比例固定，雙指不會縮放。</p>
+              <p id="expedition-map-help" class="expedition-map-help"><strong>直接指揮她：</strong>輕觸空地，她會走到指定位置；途中可再點別處立即改道。輕觸亮起的星標，她會前往、落鏟、清土並親手收下成果。落鏟後會鎖定操作，成果展示三秒並收入背包後才能再移動。單指拖曳用來查看遠方地貌；世界比例固定，雙指不會縮放。</p>
               <p id="expedition-log" class="expedition-log" role="status" aria-live="polite">入口營地已整備：先選擇旁邊亮起的礦點，開始踏查星砂淺層。</p>
             </section>
 
@@ -380,7 +417,7 @@
                 <p class="eyebrow">下一個探索點</p>
                 <h3 id="selected-title"><span id="expedition-selected">雲舟礦場 · 潮痕淺層</span></h3>
                 <p id="expedition-selected-detail">星砂地貌 · 踏查消耗 1 專注</p>
-                <p id="expedition-queue" class="expedition-queue" aria-live="polite">下一鏟：尚未標記</p>
+                <p id="expedition-queue" class="expedition-queue" aria-live="polite">移動規則：走路途中點別處會立即改道；抵達後再決定是否挖掘</p>
                 <button id="expedition-dig" class="primary-button" type="button">前往潮痕淺灘踏查（-1）</button>
                 <div id="expedition-map-controls" class="expedition-map-controls" aria-label="改選相鄰探索點">
                   <span></span><button type="button" data-expedition-move="0,-1" aria-label="選擇北側探索點">↑</button><span></span>
@@ -394,11 +431,45 @@
                 <ul>
                   <li>已踏查的地點與找到的寶物永久保存。</li>
                   <li>專注每 5 分鐘自然回復 1 點；月芽暖茶可即時補給，居民委託仍可留到明日。</li>
-                  <li>每次踏查都先顯示移動、翻土與成果；可預約下一鏟，但不會跳過正在發生的回饋。</li>
+                  <li>移動中可隨時改道；落鏟後會暫時鎖定，完整看完三秒成果才恢復指揮。</li>
                 </ul>
               </section>
             </aside>
           </div>
+
+          <section id="expedition-bag-panel" class="expedition-overlay-panel" role="dialog" aria-modal="true" aria-labelledby="expedition-bag-title" hidden>
+            <div class="expedition-inventory-card">
+              <button id="expedition-close-bag" class="expedition-panel-close" type="button" aria-label="關閉背包">×</button>
+              <p class="eyebrow">隨身行囊</p>
+              <h2 id="expedition-bag-title">璃芽的遠征背包</h2>
+              <p>材料會用於補給與建設；鑰匙及寶物一旦取得就永久保存。</p>
+              <div id="expedition-bag-grid" class="expedition-bag-grid"></div>
+              <h3>重要物品</h3>
+              <div id="expedition-key-grid" class="expedition-key-grid"></div>
+            </div>
+          </section>
+
+          <section id="expedition-collection-panel" class="expedition-overlay-panel" role="dialog" aria-modal="true" aria-labelledby="expedition-collection-title" hidden>
+            <div class="expedition-inventory-card collection-book-card">
+              <button id="expedition-close-collection" class="expedition-panel-close" type="button" aria-label="關閉寶物簿">×</button>
+              <p class="eyebrow">穹星礦場收藏</p>
+              <h2 id="expedition-collection-title">星脈寶物簿</h2>
+              <p id="expedition-collection-summary">已找到 0 / 3 件主要寶物</p>
+              <div id="expedition-collection-grid" class="expedition-collection-grid"></div>
+            </div>
+          </section>
+
+          <section id="expedition-complete-overlay" class="expedition-complete-overlay" role="dialog" aria-modal="true" aria-labelledby="expedition-complete-title" hidden>
+            <div class="complete-rays" aria-hidden="true"></div>
+            <div class="expedition-complete-card">
+              <span class="complete-crown" aria-hidden="true">✦</span>
+              <p class="eyebrow">全收藏達成</p>
+              <h2 id="expedition-complete-title">穹星礦場的記憶完整復原</h2>
+              <p>三件主要寶物已永久收入星脈寶物簿。每一層的探索地貌與鑰匙也都會保留。</p>
+              <div id="expedition-complete-relics" class="complete-relics" aria-hidden="true"></div>
+              <button id="expedition-complete-close" class="primary-button" type="button">收下全收藏紀念</button>
+            </div>
+          </section>
         </section>
 
         <div id="clinic-view" hidden>
@@ -586,6 +657,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.12.3"></script>
+    <script type="module" src="./src/app.js?v=0.13.0"></script>
   </body>
 </html>
