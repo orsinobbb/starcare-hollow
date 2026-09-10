@@ -1,4 +1,15 @@
-import { EXPEDITION_HEIGHT, EXPEDITION_WIDTH, isInBounds, isRevealed, targetAt, terrainAt } from "./expedition-engine.js";
+import {
+  EXPEDITION_HEIGHT,
+  EXPEDITION_WIDTH,
+  canEnterDoor,
+  doorAt,
+  isInBounds,
+  isRevealed,
+  keyAt,
+  targetAt,
+  terrainAt,
+  visibilityAt
+} from "./expedition-engine.js";
 
 const MAX_PARTICLES = 40;
 const TAP_DISTANCE_PX = 8;
@@ -41,10 +52,11 @@ function drawRoundedRect(context, x, y, width, height, radius) {
 }
 
 export class ExpeditionRenderer {
-  constructor(canvas, { onExcavate = () => {}, onFocusTile = () => {}, onStage = () => {}, onMove = () => {} } = {}) {
+  constructor(canvas, { onExcavate = () => {}, onEnterDoor = () => {}, onFocusTile = () => {}, onStage = () => {}, onMove = () => {} } = {}) {
     this.canvas = canvas;
     this.context = canvas.getContext("2d", { alpha: false });
     this.onExcavate = onExcavate;
+    this.onEnterDoor = onEnterDoor;
     this.onFocusTile = onFocusTile;
     this.onStage = onStage;
     this.onMove = onMove;
@@ -59,6 +71,7 @@ export class ExpeditionRenderer {
     this.hoverTile = null;
     this.particles = [];
     this.excavation = null;
+    this.doorTransition = null;
     this.minerTile = { x: 0, y: 0 };
     this.movement = null;
     this.pendingMove = null;
@@ -88,8 +101,9 @@ export class ExpeditionRenderer {
 
   setState(state) {
     const isFirstState = !this.state;
+    const mapChanged = this.state?.activeMapId && this.state.activeMapId !== state.activeMapId;
     this.state = state;
-    if (isFirstState) {
+    if (isFirstState || mapChanged) {
       // Deliberately show the landing camp first. The island is larger than a
       // phone viewport, so the player discovers it by travelling instead of
       // seeing a complete square board at once.
@@ -102,6 +116,10 @@ export class ExpeditionRenderer {
       this.camera.y = Math.min(Math.max(0, halfHeight - 0.7), this.state.height - halfHeight);
       this.camera.vx = 0;
       this.camera.vy = 0;
+      this.minerTile = { x: 0, y: 0 };
+      this.movement = null;
+      this.pendingMove = null;
+      this.keyboardTile = { x: 1, y: 0 };
     }
     if (!isInBounds(state, this.keyboardTile.x, this.keyboardTile.y)) this.keyboardTile = { x: 0, y: 0 };
     this.constrainCamera();
@@ -220,7 +238,7 @@ export class ExpeditionRenderer {
       reveal: EXCAVATION_TIMELINE.reveal * multiplier,
       reward: EXCAVATION_TIMELINE.reward * multiplier,
       settle: EXCAVATION_TIMELINE.settle * multiplier,
-      discovery: event.type === "discovery" ? EXCAVATION_TIMELINE.discovery * multiplier : 0
+      discovery: ["discovery", "key"].includes(event.type) ? EXCAVATION_TIMELINE.discovery * multiplier : 0
     };
     timeline.total = timeline.walk + timeline.aim + timeline.impact + timeline.reveal + timeline.discovery + timeline.reward + timeline.settle;
     return timeline;
@@ -258,10 +276,10 @@ export class ExpeditionRenderer {
       this.emitExcavationStage("reveal");
       if (!animation.revealBurst) {
         animation.revealBurst = true;
-        this.spawnBurst(tile, event.terrain, event.type === "discovery" ? 12 : 7, "shard");
+        this.spawnBurst(tile, event.terrain, ["discovery", "key"].includes(event.type) ? 12 : 7, "shard");
       }
-    } else if (event.type === "discovery" && animation.elapsed < rewardAt) {
-      this.emitExcavationStage("discovery");
+    } else if (["discovery", "key"].includes(event.type) && animation.elapsed < rewardAt) {
+      this.emitExcavationStage(event.type);
       if (!animation.discoveryBurst) {
         animation.discoveryBurst = true;
         this.shake.energy = this.reducedMotion ? 0 : 1.6;
@@ -271,7 +289,7 @@ export class ExpeditionRenderer {
       this.emitExcavationStage("reward");
       if (!animation.rewardBurst) {
         animation.rewardBurst = true;
-        this.spawnBurst(tile, event.terrain, event.type === "discovery" ? 16 : 9, "star");
+        this.spawnBurst(tile, event.terrain, ["discovery", "key"].includes(event.type) ? 16 : 9, "star");
       }
     } else {
       this.emitExcavationStage("settle");
@@ -418,6 +436,15 @@ export class ExpeditionRenderer {
   }
 
   currentMinerPosition() {
+    if (this.doorTransition) {
+      const { origin, tile, startedAt, duration } = this.doorTransition;
+      const travel = clamp((performance.now() - startedAt) / Math.max(1, duration), 0, 1);
+      const progress = travel * travel * (3 - 2 * travel);
+      return {
+        x: origin.x + (tile.x - origin.x) * progress,
+        y: origin.y + (tile.y - origin.y) * progress
+      };
+    }
     if (this.excavation) {
       const { origin, tile, elapsed, timeline } = this.excavation;
       const travel = clamp(elapsed / Math.max(0.001, timeline.walk), 0, 1);
@@ -539,11 +566,18 @@ export class ExpeditionRenderer {
     const wasTap = !this.pointer.moved;
     if (wasTap) {
       const tile = this.nearestTile(event.clientX, event.clientY);
+      const door = isInBounds(this.state, tile.x, tile.y) ? doorAt(this.state, tile.x, tile.y) : null;
+      const isDoorIntent = door
+        && visibilityAt(this.state, tile.x, tile.y) !== "dark"
+        && tile.distance <= this.tileSize * 0.55;
       const isDigIntent = isInBounds(this.state, tile.x, tile.y)
         && !isRevealed(this.state, tile.x, tile.y)
         && this.isSelectable(tile.x, tile.y)
         && tile.distance <= this.tileSize * DIG_BEACON_HIT_RADIUS;
-      if (isDigIntent) {
+      if (isDoorIntent) {
+        this.setKeyboardTile(tile.x, tile.y);
+        this.onEnterDoor(tile);
+      } else if (isDigIntent) {
         this.setKeyboardTile(tile.x, tile.y);
         this.onExcavate(tile);
       } else {
@@ -588,7 +622,8 @@ export class ExpeditionRenderer {
       return;
     }
     if (event.key === "Enter" || event.key === " ") {
-      this.onExcavate(this.keyboardTile);
+      if (doorAt(this.state, this.keyboardTile.x, this.keyboardTile.y)) this.onEnterDoor(this.keyboardTile);
+      else this.onExcavate(this.keyboardTile);
       event.preventDefault();
     }
   }
@@ -624,6 +659,26 @@ export class ExpeditionRenderer {
           }
         }, Math.ceil(timeline.total * 1000));
       }
+    });
+  }
+
+  playDoorTransition(tile, event) {
+    if (this.doorTransition) return Promise.resolve();
+    const duration = this.reducedMotion ? 460 : 920;
+    const origin = this.currentMinerPosition();
+    this.movement = null;
+    this.pendingMove = null;
+    if (Math.abs(tile.x - origin.x) > 0.04) this.minerFacing = tile.x >= origin.x ? 1 : -1;
+    return new Promise((resolve) => {
+      this.doorTransition = { tile: { ...tile }, origin, event, startedAt: performance.now(), duration };
+      this.onStage({ stage: "door", tile, event });
+      this.spawnBurst(tile, terrainAt(this.state, tile.x, tile.y), 20, "star");
+      window.setTimeout(() => {
+        this.minerTile = { ...tile };
+        this.doorTransition = null;
+        resolve();
+        this.render();
+      }, duration);
     });
   }
 
@@ -690,6 +745,10 @@ export class ExpeditionRenderer {
         const revealed = isRevealed(this.state, x, y);
         const selectable = !revealed && this.isSelectable(x, y);
         this.drawTile(context, x, y, left, top, this.tileSize, revealed, selectable);
+        const door = doorAt(this.state, x, y);
+        if (door && visibilityAt(this.state, x, y) !== "dark") {
+          this.drawDoor(context, door, screen.x, screen.y, this.tileSize, canEnterDoor(this.state, x, y).ok);
+        }
       }
     }
     this.drawMovementTarget(context);
@@ -1022,36 +1081,44 @@ export class ExpeditionRenderer {
     const width = Math.abs(end.x - start.x) + this.tileSize * 2;
     const height = Math.abs(end.y - start.y) + this.tileSize * 2;
 
-    // Mine haze conceals secrets, not the ground itself. The mine stays
-    // legible as one coherent place; only the bright beacons and hollows tell
-    // the player what has actually been explored.
+    // One continuous veil creates four readable states without turning the
+    // mine back into a board: untouched darkness, frontier shadow, saved
+    // exploration and the warm trace excavated during this play session.
     context.save();
     const mist = context.createLinearGradient(left, top, left + width, top + height);
-    mist.addColorStop(0, "rgba(24, 50, 83, 0.16)");
-    mist.addColorStop(0.55, "rgba(19, 43, 73, 0.32)");
-    mist.addColorStop(1, "rgba(12, 31, 60, 0.42)");
+    mist.addColorStop(0, "rgba(7, 20, 42, 0.74)");
+    mist.addColorStop(0.55, "rgba(5, 17, 38, 0.84)");
+    mist.addColorStop(1, "rgba(2, 10, 26, 0.91)");
     context.fillStyle = mist;
     context.fillRect(left, top, width, height);
 
-    context.globalAlpha = 0.28;
-    for (const [x, y, radius] of [[1.45, 1.15, 1.15], [4.35, 2.2, 1.45], [6.72, 5.3, 1.32]]) {
+    context.globalCompositeOperation = "destination-out";
+    for (let y = 0; y < this.state.height; y += 1) for (let x = 0; x < this.state.width; x += 1) {
+      const visibility = visibilityAt(this.state, x, y);
+      if (visibility === "dark") continue;
       const screen = this.tileToScreen(x, y);
-      const haze = context.createRadialGradient(screen.x, screen.y, this.tileSize * 0.06, screen.x, screen.y, this.tileSize * radius);
-      haze.addColorStop(0, "rgba(222, 239, 250, 0.3)");
-      haze.addColorStop(1, "rgba(222, 239, 250, 0)");
-      context.fillStyle = haze;
+      const radius = this.tileSize * (visibility === "shadow" ? 0.6 : 0.88);
+      const clearing = context.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
+      const alpha = visibility === "shadow" ? 0.34 : visibility === "current" ? 0.96 : 0.82;
+      clearing.addColorStop(0, `rgba(0,0,0,${alpha})`);
+      clearing.addColorStop(0.68, `rgba(0,0,0,${alpha * 0.72})`);
+      clearing.addColorStop(1, "rgba(0,0,0,0)");
+      context.fillStyle = clearing;
       context.beginPath();
-      context.arc(screen.x, screen.y, this.tileSize * radius, 0, Math.PI * 2);
+      context.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
       context.fill();
     }
 
-    context.globalAlpha = 0.18;
-    context.strokeStyle = "#b8d9e9";
-    context.lineWidth = Math.max(1, this.tileSize * 0.018);
-    for (let index = 0; index < 5; index += 1) {
-      const y = top + (index + 1) * height / 6;
+    context.globalCompositeOperation = "source-over";
+    for (let y = 0; y < this.state.height; y += 1) for (let x = 0; x < this.state.width; x += 1) {
+      const visibility = visibilityAt(this.state, x, y);
+      if (visibility !== "shadow" && visibility !== "current") continue;
+      const screen = this.tileToScreen(x, y);
+      context.globalAlpha = visibility === "current" ? 0.72 : 0.2;
+      context.strokeStyle = visibility === "current" ? "#ffe797" : "#9ab8d8";
+      context.lineWidth = Math.max(1.2, this.tileSize * (visibility === "current" ? 0.032 : 0.018));
       context.beginPath();
-      context.bezierCurveTo(left, y, left + width * 0.32, y - this.tileSize * 0.12, left + width * 0.64, y + this.tileSize * 0.12, left + width, y - this.tileSize * 0.04);
+      context.arc(screen.x, screen.y, this.tileSize * (visibility === "current" ? 0.41 : 0.32), 0, Math.PI * 2);
       context.stroke();
     }
     context.restore();
@@ -1073,6 +1140,8 @@ export class ExpeditionRenderer {
       if (target && this.state.foundTargetIds.includes(target.id)) {
         this.drawRelic(context, target, centerX, centerY, size, this.relicRevealProgress(animation));
       }
+      const key = keyAt(this.state, x, y);
+      if (key && this.state.collectedKeyIds.includes(key.id)) this.drawFoundKey(context, centerX, centerY, size, animation);
     } else if (selectable) this.drawFrontierBeacon(context, centerX, centerY, size);
 
     if (isKeyboardTile || isHoverTile) {
@@ -1088,6 +1157,41 @@ export class ExpeditionRenderer {
     const animation = this.activeExcavationAt(x, y);
     if (animation) this.drawExcavationOverlay(context, animation, left, top, size, Math.max(8, size * 0.18));
     if (this.queuedTile?.x === x && this.queuedTile?.y === y) this.drawQueuedMarker(context, left, top, size, Math.max(8, size * 0.18));
+  }
+
+  drawDoor(context, door, x, y, size, unlocked) {
+    const transition = this.doorTransition?.event?.door?.id === door.id;
+    const pulse = 0.5 + Math.sin(performance.now() / 260) * 0.16;
+    context.save();
+    context.translate(x, y - size * 0.07);
+    const glow = context.createRadialGradient(0, 0, size * 0.05, 0, 0, size * 0.62);
+    glow.addColorStop(0, unlocked ? `rgba(133,247,210,${transition ? 0.9 : pulse})` : "rgba(255,194,102,0.45)");
+    glow.addColorStop(1, "rgba(60,92,128,0)");
+    context.fillStyle = glow;
+    context.beginPath();
+    context.arc(0, 0, size * 0.62, 0, Math.PI * 2);
+    context.fill();
+
+    context.lineWidth = Math.max(3, size * 0.07);
+    context.strokeStyle = unlocked ? "#b9f4cf" : "#b98b60";
+    context.fillStyle = "rgba(18,31,52,0.92)";
+    context.beginPath();
+    context.moveTo(-size * 0.27, size * 0.29);
+    context.lineTo(-size * 0.27, -size * 0.08);
+    context.arc(0, -size * 0.08, size * 0.27, Math.PI, 0);
+    context.lineTo(size * 0.27, size * 0.29);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.fillStyle = unlocked ? "#c9ffe3" : "#ffd693";
+    context.font = `bold ${Math.max(14, size * 0.24)}px system-ui, sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(unlocked ? "✦" : "🔒", 0, size * 0.02);
+    context.font = `700 ${Math.max(9, size * 0.105)}px system-ui, sans-serif`;
+    context.fillStyle = "#fff3c2";
+    context.fillText(door.name, 0, size * 0.46);
+    context.restore();
   }
 
   drawFrontierBeacon(context, x, y, size) {
@@ -1111,6 +1215,22 @@ export class ExpeditionRenderer {
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText("✦", x, y + 1);
+    context.restore();
+  }
+
+  drawFoundKey(context, x, y, size, animation) {
+    const progress = animation ? this.relicRevealProgress(animation) : 1;
+    const float = Math.sin(performance.now() / 330) * size * 0.035;
+    context.save();
+    context.translate(x, y - size * 0.18 + float);
+    context.scale(Math.max(0.05, progress), Math.max(0.05, progress));
+    context.shadowColor = "#ffe47f";
+    context.shadowBlur = size * 0.22;
+    context.fillStyle = "#ffe18a";
+    context.font = `${Math.max(18, size * 0.34)}px system-ui, sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("🔑", 0, 0);
     context.restore();
   }
 
@@ -1147,7 +1267,7 @@ export class ExpeditionRenderer {
   relicRevealProgress(animation) {
     if (!animation) return 1;
     const reveal = this.revealProgress(animation);
-    if (animation.event.type !== "discovery") return 1;
+    if (!["discovery", "key"].includes(animation.event.type)) return 1;
     const discoveryStart = animation.timeline.walk + animation.timeline.aim + animation.timeline.impact + animation.timeline.reveal * 0.58;
     return reveal * clamp((animation.elapsed - discoveryStart) / Math.max(0.001, animation.timeline.discovery * 0.48), 0, 1);
   }

@@ -471,7 +471,8 @@ export function recordExpeditionProgress(state, expedition, event = {}) {
   const becameComplete = normalized.completed && !state.expedition?.completed;
 
   next.expedition = normalized;
-  if (event.type === "dig" || event.type === "discovery") next.lifetime.expeditionDigs += 1;
+  const countsAsDig = ["dig", "discovery", "key"].includes(event.type);
+  if (countsAsDig) next.lifetime.expeditionDigs += 1;
   next.lifetime.relicsFound += discoveries.length;
   if (becameComplete) next.lifetime.completedExpeditions += 1;
 
@@ -491,12 +492,14 @@ export function recordExpeditionProgress(state, expedition, event = {}) {
   const rewardText = formatCost(reward);
   const message = discoveryNames.length
     ? `遠征成果已收下：${discoveryNames.join("、")}；${rewardText}。`
-    : `${event.message ?? "遠征地圖已自動保存。"} 獲得 ${rewardText}。`;
+    : rewardText
+    ? `${event.message ?? "遠征地圖已自動保存。"} 獲得 ${rewardText}。`
+    : event.message ?? "遠征地圖已自動保存。";
   return collectionOutcome(state, next, message, {
     ...reward,
     discoveries: discoveryNames,
     completed: becameComplete,
-    expeditionDigs: event.type === "dig" || event.type === "discovery" ? 1 : 0
+    expeditionDigs: countsAsDig ? 1 : 0
   });
 }
 

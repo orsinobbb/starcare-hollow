@@ -4,14 +4,17 @@ import test from "node:test";
 import {
   EXPEDITION_FOCUS_MAX,
   EXPEDITION_FOCUS_REGEN_INTERVAL_MS,
+  canEnterDoor,
   canExcavate,
   compassClue,
   createExpeditionState,
+  enterDoor,
   excavate,
   normalizeExpeditionState,
   recoverExpeditionFocus,
   regionAt,
-  tileKey
+  tileKey,
+  visibilityAt
 } from "../src/expedition-engine.js";
 
 function sandPath(state, target) {
@@ -131,7 +134,7 @@ test("a v1 save retains earned progress while adopting the coherent island geogr
 
   const migrated = normalizeExpeditionState(legacy);
 
-  assert.equal(migrated.schemaVersion, 3);
+  assert.equal(migrated.schemaVersion, 4);
   assert.equal(migrated.focus, 12);
   assert.equal(migrated.digs, 5);
   assert.deepEqual(migrated.revealed, ["0,0", "1,0", "1,1"]);
@@ -139,4 +142,50 @@ test("a v1 save retains earned progress while adopting the coherent island geogr
   assert.equal(migrated.terrain["1,0"], "sand", "old shuffled terrain becomes one continuous shore");
   assert.equal(regionAt(migrated, 3, 3).id, "grove");
   assert.equal(regionAt(migrated, 6, 3).id, "ridge");
+});
+
+test("keys open permanent doors and each mine floor keeps its own exploration progress", () => {
+  let state = createExpeditionState("three-floor-route");
+  const route = ["1,0", "2,0", "3,0", "4,0", "5,0", "6,0", "6,1"];
+  state.revealed.push(...route);
+  state.mapProgress["starfall-shaft"].revealed = [...state.revealed];
+  state.focus = 30;
+
+  const keyResult = excavate(state, 6, 2);
+  assert.equal(keyResult.ok, true);
+  assert.equal(keyResult.event.type, "key");
+  assert.ok(keyResult.state.collectedKeyIds.includes("moonvine-key"));
+
+  state = keyResult.state;
+  state.revealed.push("6,3", "6,4");
+  state.mapProgress["starfall-shaft"].revealed = [...state.revealed];
+  assert.equal(canEnterDoor(state, 7, 4).ok, true);
+
+  const entered = enterDoor(state, 7, 4);
+  assert.equal(entered.ok, true);
+  assert.equal(entered.state.activeMapId, "moonvine-gallery");
+  assert.deepEqual(entered.state.revealed, ["0,0"]);
+  assert.ok(entered.state.unlockedDoorIds.includes("moonvine-gate"));
+  assert.ok(entered.state.mapProgress["starfall-shaft"].revealed.includes("6,2"));
+
+  const returned = enterDoor(entered.state, 0, 0);
+  assert.equal(returned.ok, true);
+  assert.equal(returned.state.activeMapId, "starfall-shaft");
+  assert.ok(returned.state.revealed.includes("6,2"));
+});
+
+test("a locked gate explains the missing key and exploration visibility has four clear states", () => {
+  const state = createExpeditionState("visibility-layers");
+  state.revealed.push("1,0", "6,4");
+  state.mapProgress["starfall-shaft"].revealed = [...state.revealed];
+  state.currentRunRevealed = ["1,0"];
+
+  const locked = canEnterDoor(state, 7, 4);
+  assert.equal(locked.ok, false);
+  assert.equal(locked.reason, "key");
+  assert.match(locked.message, /月藤鑰匙/);
+  assert.equal(visibilityAt(state, 1, 0), "current");
+  assert.equal(visibilityAt(state, 0, 0), "explored");
+  assert.equal(visibilityAt(state, 2, 0), "shadow");
+  assert.equal(visibilityAt(state, 7, 7), "dark");
 });

@@ -5936,9 +5936,9 @@ body[data-view="expedition"] .expedition-hud {
   left: 4.35rem;
   z-index: 43;
   display: grid;
-  grid-template-columns: minmax(136px, 1.2fr) minmax(86px, 0.72fr) minmax(102px, 0.86fr) auto;
+  grid-template-columns: minmax(136px, 1.1fr) minmax(142px, 1.1fr) minmax(78px, 0.62fr) minmax(96px, 0.76fr) auto;
   gap: 0;
-  width: min(650px, calc(100vw - 5.25rem));
+  width: min(780px, calc(100vw - 5.25rem));
   padding: 0.3rem 0.38rem;
   background: rgba(7, 23, 48, 0.78);
   border: 1px solid rgba(235, 239, 213, 0.2);
@@ -6123,12 +6123,13 @@ body[data-view="expedition"] .expedition-supply-card {
   body[data-view="expedition"] .expedition-hud {
     top: max(0.45rem, env(safe-area-inset-top));
     left: 3.8rem;
-    grid-template-columns: minmax(105px, 1.1fr) minmax(60px, 0.65fr) auto;
+    grid-template-columns: minmax(102px, 1fr) minmax(118px, 1.05fr) auto;
     width: calc(100vw - 4.25rem);
     padding: 0.26rem;
   }
 
-  body[data-view="expedition"] .expedition-hud .hud-stat:nth-child(3) {
+  body[data-view="expedition"] .expedition-hud .hud-stat:nth-child(3),
+  body[data-view="expedition"] .expedition-hud .hud-stat:nth-child(4) {
     display: none;
   }
 
