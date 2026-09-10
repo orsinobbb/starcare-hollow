@@ -9,7 +9,7 @@
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.12.2" />
+    <link rel="stylesheet" href="./styles.css?v=0.12.3" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.12.2</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.12.3</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -308,6 +308,37 @@
               <p>從入口營地進入星砂淺層、月藤坑道與星晶礦層。跟著亮起的礦點前進：每一處地貌都會留下材料、線索或遺物，而羅盤會告訴你寶物是否接近。</p>
             </div>
             <button id="expedition-return" class="secondary-button" type="button" aria-label="帶著成果返回小鎮" title="返回小鎮"><span aria-hidden="true">←</span></button>
+            <button id="expedition-help" class="secondary-button" type="button" aria-label="重新查看遠征玩法" title="玩法說明"><span aria-hidden="true">?</span></button>
+          </section>
+
+          <section id="expedition-mission" class="expedition-mission" aria-live="polite">
+            <div class="expedition-mission-copy">
+              <span class="expedition-mission-kicker">本層任務</span>
+              <strong id="expedition-objective-title">找出月藤鑰匙</strong>
+              <small id="expedition-objective-detail">點擊發光的星標挖掘；每一格都有收穫。</small>
+            </div>
+            <ol class="expedition-goal-steps" aria-label="本層探索步驟">
+              <li id="expedition-step-dig" data-state="current"><span>1</span>挖亮點</li>
+              <li id="expedition-step-key" data-state="pending"><span>2</span>找鑰匙</li>
+              <li id="expedition-step-door" data-state="pending"><span>3</span>開石門</li>
+            </ol>
+            <span class="expedition-symbol-legend"><b>✦</b> 發光星標＝可以挖</span>
+          </section>
+
+          <section id="expedition-tutorial" class="expedition-tutorial" role="dialog" aria-modal="true" aria-labelledby="expedition-tutorial-title" hidden>
+            <div class="expedition-tutorial-card">
+              <span class="expedition-tutorial-compass" aria-hidden="true">✦</span>
+              <p class="eyebrow">第一次遠征</p>
+              <h2 id="expedition-tutorial-title">找到鑰匙，打開下一層石門</h2>
+              <p>你是挖礦者的領航員。跟著地圖上的發光星標前進，每挖一格都會得到材料或線索。</p>
+              <ol>
+                <li><span>1</span><div><strong>找發光星標</strong><small>這代表現在可以前往挖掘。</small></div></li>
+                <li><span>2</span><div><strong>點一下開始挖</strong><small>角色會走過去、落鏟，再把獎勵交給你。</small></div></li>
+                <li><span>3</span><div><strong>找到鑰匙開石門</strong><small>進度會自動保存，進入下一個礦層。</small></div></li>
+              </ol>
+              <button id="expedition-tutorial-start" class="primary-button" type="button">帶我去第一個挖掘點</button>
+              <small class="expedition-tutorial-note">之後可點左上角的「?」再次查看</small>
+            </div>
           </section>
 
           <div class="expedition-layout">
@@ -555,6 +586,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.12.2"></script>
+    <script type="module" src="./src/app.js?v=0.12.3"></script>
   </body>
 </html>

@@ -1160,7 +1160,7 @@ export class ExpeditionRenderer {
       }
       const key = keyAt(this.state, x, y);
       if (key && this.state.collectedKeyIds.includes(key.id)) this.drawFoundKey(context, centerX, centerY, size, animation);
-    } else if (selectable) this.drawFrontierBeacon(context, centerX, centerY, size);
+    } else if (selectable) this.drawFrontierBeacon(context, centerX, centerY, size, isKeyboardTile);
 
     if (isKeyboardTile || isHoverTile) {
       context.save();
@@ -1212,7 +1212,7 @@ export class ExpeditionRenderer {
     context.restore();
   }
 
-  drawFrontierBeacon(context, x, y, size) {
+  drawFrontierBeacon(context, x, y, size, guided = false) {
     context.save();
     const pulse = 0.58 + Math.sin(performance.now() / 260) * 0.16;
     const glow = context.createRadialGradient(x, y, size * 0.05, x, y, size * 0.42);
@@ -1233,6 +1233,21 @@ export class ExpeditionRenderer {
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText("✦", x, y + 1);
+    if (guided) {
+      const labelWidth = Math.max(62, size * 0.92);
+      const labelHeight = Math.max(22, size * 0.26);
+      context.globalAlpha = 1;
+      context.fillStyle = "rgba(5, 22, 43, 0.9)";
+      drawRoundedRect(context, x - labelWidth / 2, y + size * 0.3, labelWidth, labelHeight, labelHeight / 2);
+      context.fill();
+      context.strokeStyle = "rgba(255, 238, 154, 0.86)";
+      context.lineWidth = 1.4;
+      context.stroke();
+      context.fillStyle = "#fff1b0";
+      context.font = `800 ${Math.max(11, size * 0.125)}px system-ui, sans-serif`;
+      context.textBaseline = "middle";
+      context.fillText("點此挖掘", x, y + size * 0.3 + labelHeight / 2);
+    }
     context.restore();
   }
 

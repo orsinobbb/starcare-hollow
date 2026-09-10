@@ -5905,6 +5905,160 @@ body[data-view="expedition"] #expedition-return > span {
   line-height: 1;
 }
 
+body[data-view="expedition"] #expedition-help {
+  position: fixed;
+  top: max(0.7rem, env(safe-area-inset-top));
+  left: max(4.05rem, calc(env(safe-area-inset-left) + 4.05rem));
+  z-index: 44;
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  place-items: center;
+  color: #fff0bf;
+  background: rgba(8, 24, 50, 0.82);
+  border: 1px solid rgba(255, 239, 184, 0.45);
+  border-radius: 50%;
+  box-shadow: 0 7px 22px rgba(0, 8, 29, 0.42);
+  backdrop-filter: blur(12px);
+}
+
+body[data-view="expedition"] .expedition-mission {
+  position: fixed;
+  top: max(4.45rem, calc(env(safe-area-inset-top) + 4rem));
+  left: max(0.8rem, env(safe-area-inset-left));
+  z-index: 42;
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) auto;
+  gap: 0.42rem 1rem;
+  width: min(570px, calc(100vw - 2rem));
+  padding: 0.7rem 0.8rem;
+  color: #f8f3dc;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(7, 25, 50, 0.94), rgba(18, 61, 67, 0.9));
+  border: 1px solid rgba(255, 232, 151, 0.38);
+  border-left: 4px solid #f3ca65;
+  border-radius: 0 15px 15px 0;
+  box-shadow: 0 10px 30px rgba(0, 8, 29, 0.42);
+  backdrop-filter: blur(14px);
+}
+
+.expedition-mission-copy {
+  display: grid;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.expedition-mission-kicker {
+  color: #f7d77e;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.expedition-mission-copy strong {
+  overflow: hidden;
+  font-size: 1rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expedition-mission-copy small {
+  color: #dce9de;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.expedition-goal-steps {
+  display: flex;
+  gap: 0.28rem;
+  padding: 0;
+  margin: 0;
+  align-items: center;
+  list-style: none;
+}
+
+.expedition-goal-steps li {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 48px;
+  color: #71839a;
+  font-size: 0.56rem;
+  font-weight: 800;
+  place-items: center;
+}
+
+.expedition-goal-steps li span {
+  display: grid;
+  width: 1.55rem;
+  height: 1.55rem;
+  color: #aebbd0;
+  background: rgba(2, 14, 34, 0.65);
+  border: 1px solid rgba(174, 187, 208, 0.32);
+  border-radius: 50%;
+  place-items: center;
+}
+
+.expedition-goal-steps li[data-state="current"] { color: #ffe89b; }
+.expedition-goal-steps li[data-state="current"] span {
+  color: #14243b;
+  background: #f5d36e;
+  border-color: #fff0ae;
+  box-shadow: 0 0 16px rgba(245, 211, 110, 0.62);
+}
+.expedition-goal-steps li[data-state="done"] { color: #a8e2bd; }
+.expedition-goal-steps li[data-state="done"] span {
+  color: transparent;
+  background: #4b9a70;
+  border-color: #b8efc9;
+}
+.expedition-goal-steps li[data-state="done"] span::after { color: #fff; content: "✓"; }
+
+.expedition-symbol-legend {
+  grid-column: 1 / -1;
+  color: #d9e6dc;
+  font-size: 0.62rem;
+}
+
+.expedition-symbol-legend b { color: #fff0a2; font-size: 0.9rem; }
+
+body[data-view="expedition"] .expedition-tutorial[hidden] { display: none; }
+
+body[data-view="expedition"] .expedition-tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  overflow: auto;
+  place-items: center;
+  background: radial-gradient(circle at 50% 30%, rgba(35, 84, 92, 0.62), rgba(3, 13, 32, 0.92));
+  backdrop-filter: blur(9px);
+}
+
+.expedition-tutorial-card {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 1.5rem;
+  color: #f8f3dc;
+  background: linear-gradient(150deg, #112e4b, #0c263d 65%, #173f3f);
+  border: 1px solid rgba(255, 229, 142, 0.5);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(0, 5, 20, 0.68), inset 0 1px rgba(255, 255, 255, 0.09);
+}
+
+.expedition-tutorial-card h2 { max-width: 340px; margin: 0.25rem 0 0.6rem; font-size: clamp(1.35rem, 5vw, 1.85rem); }
+.expedition-tutorial-card > p:not(.eyebrow) { color: #d9e6dc; font-size: 0.9rem; line-height: 1.55; }
+.expedition-tutorial-card ol { display: grid; gap: 0.55rem; padding: 0; margin: 1rem 0 1.2rem; list-style: none; }
+.expedition-tutorial-card li { display: grid; grid-template-columns: 2.1rem 1fr; gap: 0.65rem; align-items: center; }
+.expedition-tutorial-card li > span { display: grid; width: 2rem; height: 2rem; color: #13233a; font-weight: 900; background: #f4d270; border-radius: 50%; place-items: center; }
+.expedition-tutorial-card li div { display: grid; gap: 0.08rem; }
+.expedition-tutorial-card li small { color: #b9cdbf; font-size: 0.72rem; }
+.expedition-tutorial-card .primary-button { width: 100%; min-height: 3rem; font-size: 0.9rem; }
+.expedition-tutorial-note { display: block; margin-top: 0.55rem; color: #9eb3b3; text-align: center; }
+.expedition-tutorial-compass { position: absolute; top: 1.2rem; right: 1.3rem; color: #ffe28c; font-size: 2rem; filter: drop-shadow(0 0 12px rgba(255, 226, 140, 0.65)); }
+
 body[data-view="expedition"] .expedition-layout,
 body[data-view="expedition"] .expedition-map-card {
   display: block;
@@ -6152,11 +6306,38 @@ body[data-view="expedition"] .expedition-supply-card {
   }
 
   body[data-view="expedition"] .compass-card {
-    top: max(4.55rem, calc(env(safe-area-inset-top) + 4.1rem));
+    top: max(10.7rem, calc(env(safe-area-inset-top) + 10.2rem));
     right: 0.55rem;
     width: min(202px, calc(100vw - 1.1rem));
     padding: 0.55rem 0.62rem;
   }
+
+  body[data-view="expedition"] #expedition-help {
+    top: max(3.55rem, calc(env(safe-area-inset-top) + 3.1rem));
+    left: max(0.78rem, env(safe-area-inset-left));
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  body[data-view="expedition"] .expedition-mission {
+    top: max(4.55rem, calc(env(safe-area-inset-top) + 4.1rem));
+    right: 0.55rem;
+    left: 0.55rem;
+    grid-template-columns: 1fr;
+    gap: 0.42rem;
+    width: auto;
+    padding: 0.58rem 0.65rem;
+    border-left-width: 3px;
+  }
+
+  .expedition-mission-copy strong { font-size: 0.88rem; }
+  .expedition-mission-copy small { font-size: 0.62rem; }
+  .expedition-goal-steps { justify-content: flex-start; }
+  .expedition-goal-steps li { grid-template-columns: 1.35rem auto; min-width: 0; font-size: 0.54rem; }
+  .expedition-goal-steps li span { width: 1.3rem; height: 1.3rem; }
+  .expedition-symbol-legend { position: absolute; right: 0.65rem; bottom: 0.62rem; }
+
+  .expedition-tutorial-card { padding: 1.2rem; border-radius: 20px; }
 
   body[data-view="expedition"] .excavation-card {
     right: 0.55rem;

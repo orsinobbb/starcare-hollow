@@ -22,6 +22,8 @@ import {
 } from "./town.js";
 import { ExpeditionRenderer } from "./expedition-renderer.js";
 
+const EXPEDITION_TUTORIAL_KEY = "starcare-expedition-tutorial-v1";
+
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -68,7 +70,16 @@ export function createExpeditionController({ root = document, townController, on
     log: element("#expedition-log"),
     compass: element("#expedition-compass"),
     stage: element("#expedition-stage"),
-    controls: element("#expedition-map-controls")
+    controls: element("#expedition-map-controls"),
+    mission: element("#expedition-mission"),
+    objectiveTitle: element("#expedition-objective-title"),
+    objectiveDetail: element("#expedition-objective-detail"),
+    stepDig: element("#expedition-step-dig"),
+    stepKey: element("#expedition-step-key"),
+    stepDoor: element("#expedition-step-door"),
+    tutorial: element("#expedition-tutorial"),
+    tutorialStart: element("#expedition-tutorial-start"),
+    help: element("#expedition-help")
   };
 
   const renderer = new ExpeditionRenderer(canvas, {
@@ -219,10 +230,10 @@ export function createExpeditionController({ root = document, townController, on
           : `需要鑰匙才能開門`
         : isAnimating
         ? permission.ok
-          ? queued ? `已預約下一鏟：${terrain.name}` : `預約下一鏟：${terrain.name}（-${terrain.cost}）`
+          ? queued ? `已預約下一鏟：${terrain.name}` : `預約挖掘「${terrain.name}」（-${terrain.cost} 專注）`
           : "這裡目前還不能前往"
         : permission.ok
-        ? `前往${location.split(" · ")[1]}踏查（-${terrain.cost}）`
+        ? `⛏ 挖掘「${location.split(" · ")[1]}」（-${terrain.cost} 專注）`
         : "這裡目前還不能踏查";
     }
     canvas.setAttribute("aria-busy", String(isAnimating));
@@ -267,6 +278,98 @@ export function createExpeditionController({ root = document, townController, on
     return availableDoors.find((door) => !state.visitedMapIds.includes(door.toMapId)) ?? availableDoors[0] ?? null;
   }
 
+  function nextPlayableTarget() {
+    const map = activeMap(state);
+    const keyCollected = !map.key || state.collectedKeyIds.includes(map.key.id);
+    if (keyCollected) {
+      const door = map.doors.find((item) => canEnterDoor(state, item.x, item.y).ok);
+      if (door) return { x: door.x, y: door.y, type: "door", name: door.name };
+    }
+    const testState = { ...state, focus: EXPEDITION_FOCUS_MAX };
+    for (let y = 0; y < state.height; y += 1) for (let x = 0; x < state.width; x += 1) {
+      if (canExcavate(testState, x, y).ok) return { x, y, type: "dig", name: locationNameFor(x, y) };
+    }
+    return null;
+  }
+
+  function setGoalState(element, value) {
+    if (element) element.dataset.state = value;
+  }
+
+  function renderMission() {
+    const map = activeMap(state);
+    const explored = Math.max(0, state.revealed.length - 1);
+    const keyCollected = !map.key || state.collectedKeyIds.includes(map.key.id);
+    const doorUnlocked = map.doors.some((door) => state.unlockedDoorIds.includes(door.id));
+    const availableDoor = map.doors.find((door) => canEnterDoor(state, door.x, door.y).ok);
+    let title = `在${map.name}尋找線索`;
+    let detail = "點擊發光的星標挖掘；每一格都有材料、線索或寶物。";
+
+    if (state.completed) {
+      title = "主要寶物已全數尋回";
+      detail = "遠征完成。成果已永久收進星願手札，可以安心返回小鎮。";
+    } else if (map.key && !keyCollected) {
+      title = explored === 0 ? `第一步：挖開發光星標` : `繼續挖掘，找出${map.key.name}`;
+      detail = explored === 0
+        ? "點地圖上的發光星標，或按下方黃色「挖掘」按鈕；挖礦者會走過去並帶回獎勵。"
+        : "羅盤會提示寶物遠近；只有發光星標是目前可挖的位置。";
+    } else if (availableDoor) {
+      title = `鑰匙到手：開啟${availableDoor.name}`;
+      detail = "點擊地圖上發光的石門，前往下一個礦層。";
+    } else if (map.key) {
+      title = `向${map.doors[0]?.name ?? "石門"}前進`;
+      detail = "鑰匙已找到；繼續挖亮起的星標，開通前往石門的路。";
+    } else {
+      title = "搜索星晶秘庫的最後寶物";
+      detail = "繼續挖掘發光星標；找到主寶物後即可完成遠征。";
+    }
+
+    if (state.focus <= 0 && !state.completed) {
+      detail = `專注已用完，${countdownText(recoverExpeditionFocus(state).remainingMs)} 後自然回復 1 點；也可按上方「補給」。`;
+    }
+    if (ui.objectiveTitle) ui.objectiveTitle.textContent = title;
+    if (ui.objectiveDetail) ui.objectiveDetail.textContent = detail;
+    setGoalState(ui.stepDig, explored > 0 ? "done" : "current");
+    setGoalState(ui.stepKey, keyCollected ? "done" : explored > 0 ? "current" : "pending");
+    setGoalState(ui.stepDoor, doorUnlocked || state.completed ? "done" : keyCollected ? "current" : "pending");
+  }
+
+  function tutorialSeen() {
+    try { return window.localStorage.getItem(EXPEDITION_TUTORIAL_KEY) === "seen"; }
+    catch { return false; }
+  }
+
+  function setTutorialOpen(open) {
+    if (!ui.tutorial) return;
+    ui.tutorial.hidden = !open;
+    if (open) window.setTimeout(() => ui.tutorialStart?.focus({ preventScroll: true }), 0);
+    else canvas.focus({ preventScroll: true });
+  }
+
+  function beginGuidedPlay() {
+    try { window.localStorage.setItem(EXPEDITION_TUTORIAL_KEY, "seen"); } catch {}
+    setTutorialOpen(false);
+    const target = nextPlayableTarget();
+    if (!target) return;
+    selectedTile = { x: target.x, y: target.y };
+    renderer.guideToTile(target.x, target.y);
+    updateStage("guide", target.type === "door" ? "門" : "☝", target.type === "door"
+      ? `點擊發光的${target.name}，前往下一層。`
+      : "鏡頭已帶到第一個礦點。點地圖上的發光星標，或按下方黃色「挖掘」按鈕。");
+    renderSelection();
+  }
+
+  function guideReturningPlayer() {
+    const target = nextPlayableTarget();
+    if (!target) return;
+    selectedTile = { x: target.x, y: target.y };
+    renderer.guideToTile(target.x, target.y);
+    updateStage("guide", target.type === "door" ? "門" : "☝", target.type === "door"
+      ? `下一步：點擊發光的${target.name}，前往下一層。`
+      : "下一個可挖位置已經為你亮起。點發光星標，或按下方黃色「挖掘」按鈕。");
+    renderSelection();
+  }
+
   function render() {
     const recovery = synchronizePassiveFocus();
     const found = state.foundTargetIds.length;
@@ -282,6 +385,7 @@ export function createExpeditionController({ root = document, townController, on
     if (ui.clueTitle) ui.clueTitle.textContent = state.lastClue.title;
     if (ui.clueDetail) ui.clueDetail.textContent = state.lastClue.detail;
     if (ui.compass) ui.compass.dataset.clue = state.lastClue.level;
+    renderMission();
     canvas.setAttribute("aria-label", `穹星礦場踏查地圖。已踏查 ${explored} 處，找到 ${found} / ${state.targets.length} 件主要遺物。輕觸空地可移動；輕觸亮起星標可挖掘。使用方向鍵選擇礦點，Enter 踏查。`);
     renderer.setState(renderedState());
     const exit = !isAnimating ? completedFloorExit() : null;
@@ -380,6 +484,12 @@ export function createExpeditionController({ root = document, townController, on
       if (permission.ok) return beginExcavation(nextTile.x, nextTile.y);
       onNotify(`下一鏟的路徑已改變：${permission.message}`);
     }
+    const upcoming = nextPlayableTarget();
+    if (upcoming) {
+      selectedTile = { x: upcoming.x, y: upcoming.y };
+      renderer.guideToTile(upcoming.x, upcoming.y);
+      renderSelection();
+    }
     return result;
   }
 
@@ -451,6 +561,8 @@ export function createExpeditionController({ root = document, townController, on
   ui.resupply?.addEventListener("click", resupplyFocus);
   ui.openSupply?.addEventListener("click", () => setSupplyOpen(true));
   ui.closeSupply?.addEventListener("click", () => setSupplyOpen(false));
+  ui.help?.addEventListener("click", () => setTutorialOpen(true));
+  ui.tutorialStart?.addEventListener("click", beginGuidedPlay);
   element("#expedition-map-controls")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-expedition-move]");
     if (!button) return;
@@ -472,6 +584,8 @@ export function createExpeditionController({ root = document, townController, on
       renderer.resize();
       renderer.start();
       render();
+      if (!tutorialSeen()) setTutorialOpen(true);
+      else guideReturningPlayer();
       if (!recoveryTimer) recoveryTimer = window.setInterval(() => {
         const recovery = synchronizePassiveFocus();
         renderRecovery(recovery);
