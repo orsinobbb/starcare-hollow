@@ -144,6 +144,32 @@ test("a v1 save retains earned progress while adopting the coherent island geogr
   assert.equal(regionAt(migrated, 6, 3).id, "ridge");
 });
 
+test("a revealed key tile repairs missing key inventory and prevents a completed floor deadlock", () => {
+  const legacy = createExpeditionState("stuck-old-save");
+  legacy.schemaVersion = 3;
+  legacy.revealed = [];
+  for (let y = 0; y < legacy.height; y += 1) for (let x = 0; x < legacy.width; x += 1) {
+    legacy.revealed.push(tileKey(x, y));
+  }
+  legacy.collectedKeyIds = [];
+
+  const repaired = normalizeExpeditionState(legacy);
+
+  assert.ok(repaired.collectedKeyIds.includes("moonvine-key"));
+  assert.equal(canEnterDoor(repaired, 7, 4).ok, true);
+  assert.equal(enterDoor(repaired, 7, 4).state.activeMapId, "moonvine-gallery");
+});
+
+test("a current save also restores a key from its permanent revealed tile", () => {
+  const interrupted = createExpeditionState("interrupted-key-save");
+  interrupted.mapProgress["starfall-shaft"].revealed.push("6,2");
+  interrupted.revealed = [...interrupted.mapProgress["starfall-shaft"].revealed];
+
+  const repaired = normalizeExpeditionState(interrupted);
+
+  assert.deepEqual(repaired.collectedKeyIds, ["moonvine-key"]);
+});
+
 test("keys open permanent doors and each mine floor keeps its own exploration progress", () => {
   let state = createExpeditionState("three-floor-route");
   const route = ["1,0", "2,0", "3,0", "4,0", "5,0", "6,0", "6,1"];

@@ -144,12 +144,20 @@ export function normalizeExpeditionState(raw) {
   const validKeyIds = new Set(Object.values(EXPEDITION_MAPS).map((map) => map.key?.id).filter(Boolean));
   const validDoorIds = new Set(Object.values(EXPEDITION_MAPS).flatMap((map) => map.doors.map((door) => door.id)));
   const foundTargetIds = Array.isArray(raw.foundTargetIds) ? [...new Set(raw.foundTargetIds.filter((id) => validTargetIds.has(id)))] : [];
+  const collectedKeyIds = new Set(Array.isArray(raw.collectedKeyIds) ? raw.collectedKeyIds.filter((id) => validKeyIds.has(id)) : []);
+  // A revealed key tile means the excavation already happened. Older saves did
+  // not record keys, and an interrupted write could also omit this inventory
+  // entry. Rebuild it from permanent map progress so a completed floor can
+  // never become an unwinnable dead end.
+  for (const [mapId, map] of Object.entries(EXPEDITION_MAPS)) {
+    if (map.key && mapProgress[mapId].revealed.includes(tileKey(map.key.x, map.key.y))) collectedKeyIds.add(map.key.id);
+  }
   const state = {
     ...fallback,
     focus: Math.min(EXPEDITION_FOCUS_MAX, integer(raw.focus, fallback.focus)),
     focusUpdatedAt: integer(raw.focusUpdatedAt, fallback.focusUpdatedAt),
     activeMapId, mapProgress, foundTargetIds,
-    collectedKeyIds: Array.isArray(raw.collectedKeyIds) ? [...new Set(raw.collectedKeyIds.filter((id) => validKeyIds.has(id)))] : [],
+    collectedKeyIds: [...collectedKeyIds],
     unlockedDoorIds: Array.isArray(raw.unlockedDoorIds) ? [...new Set(raw.unlockedDoorIds.filter((id) => validDoorIds.has(id)))] : [],
     visitedMapIds: Array.isArray(raw.visitedMapIds) ? [...new Set(raw.visitedMapIds.filter((id) => EXPEDITION_MAPS[id]))] : ["starfall-shaft"],
     digs: integer(raw.digs, 0), completed: foundTargetIds.length >= fallback.targets.length || Boolean(raw.completed),

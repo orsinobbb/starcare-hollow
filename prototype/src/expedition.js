@@ -252,6 +252,16 @@ export function createExpeditionController({ root = document, townController, on
     }
   }
 
+  function completedFloorExit() {
+    if (state.completed) return null;
+    const testState = { ...state, focus: EXPEDITION_FOCUS_MAX };
+    for (let y = 0; y < state.height; y += 1) for (let x = 0; x < state.width; x += 1) {
+      if (canExcavate(testState, x, y).ok) return null;
+    }
+    const availableDoors = activeMap(state).doors.filter((door) => canEnterDoor(state, door.x, door.y).ok);
+    return availableDoors.find((door) => !state.visitedMapIds.includes(door.toMapId)) ?? availableDoors[0] ?? null;
+  }
+
   function render() {
     const recovery = synchronizePassiveFocus();
     const found = state.foundTargetIds.length;
@@ -269,6 +279,13 @@ export function createExpeditionController({ root = document, townController, on
     if (ui.compass) ui.compass.dataset.clue = state.lastClue.level;
     canvas.setAttribute("aria-label", `穹星礦場踏查地圖。已踏查 ${explored} 處，找到 ${found} / ${state.targets.length} 件主要遺物。輕觸空地可移動；輕觸亮起星標可挖掘。使用方向鍵選擇礦點，Enter 踏查。`);
     renderer.setState(renderedState());
+    const exit = !isAnimating ? completedFloorExit() : null;
+    if (exit && (selectedTile.x !== exit.x || selectedTile.y !== exit.y)) {
+      selectedTile = { x: exit.x, y: exit.y };
+      renderer.guideToTile(exit.x, exit.y);
+      updateStage("exit", "門", `本層已完整踏查；${exit.name}正在發光，請開門前往下一層。`);
+      if (ui.log) ui.log.textContent = `已經沒有遺漏的礦點。下一步：開啟${exit.name}。`;
+    }
     renderSelection();
     renderSupply(recovery);
   }

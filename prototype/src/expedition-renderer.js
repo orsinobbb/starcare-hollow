@@ -603,6 +603,20 @@ export class ExpeditionRenderer {
     this.onFocusTile(this.keyboardTile);
   }
 
+  guideToTile(x, y) {
+    if (!this.state) return;
+    this.keyboardTile = {
+      x: clamp(x, 0, this.state.width - 1),
+      y: clamp(y, 0, this.state.height - 1)
+    };
+    this.camera.vx = 0;
+    this.camera.vy = 0;
+    this.camera.x = this.keyboardTile.x;
+    this.camera.y = this.keyboardTile.y;
+    this.constrainCamera();
+    this.onFocusTile(this.keyboardTile);
+  }
+
   handleKeydown(event) {
     if (!this.state) return;
     const steps = {
