@@ -140,6 +140,7 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(renderer, /MAX_PARTICLES/);
   assert.match(renderer, /EXCAVATION_TIMELINE/);
   assert.match(renderer, /playExcavation/);
+  assert.match(renderer, /excavationTimer/);
   assert.match(renderer, /setQueuedTile/);
   assert.match(renderer, /drawMiner/);
   assert.match(renderer, /requestMovement/);
@@ -154,6 +155,8 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(css, /prefers-reduced-motion[\s\S]*\.expedition-stage > span/);
   assert.match(controller, /isAnimating/);
   assert.match(controller, /queueExcavation/);
+  assert.match(controller, /queuedDoor/);
+  assert.match(controller, /已預約開門/);
   assert.match(controller, /requestExcavate/);
   assert.match(controller, /onMove/);
   assert.match(controller, /輕觸空地可移動/);

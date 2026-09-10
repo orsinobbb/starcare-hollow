@@ -71,6 +71,7 @@ export class ExpeditionRenderer {
     this.hoverTile = null;
     this.particles = [];
     this.excavation = null;
+    this.excavationTimer = null;
     this.doorTransition = null;
     this.minerTile = { x: 0, y: 0 };
     this.movement = null;
@@ -319,6 +320,8 @@ export class ExpeditionRenderer {
   finishExcavation() {
     const animation = this.excavation;
     if (!animation) return;
+    if (this.excavationTimer) window.clearTimeout(this.excavationTimer);
+    this.excavationTimer = null;
     this.emitExcavationStage("settle");
     this.minerTile = { ...animation.tile };
     this.excavation = null;
@@ -665,14 +668,15 @@ export class ExpeditionRenderer {
       };
       this.emitExcavationStage("walk");
       this.render();
-      if (!this.running) {
-        window.setTimeout(() => {
-          if (this.excavation?.resolve === resolve) {
-            this.finishExcavation();
-            this.render();
-          }
-        }, Math.ceil(timeline.total * 1000));
-      }
+      // Mobile browsers can suspend requestAnimationFrame while the page is
+      // backgrounded. Always keep a real-time completion fallback so the
+      // controller can never remain permanently locked in an animation.
+      this.excavationTimer = window.setTimeout(() => {
+        if (this.excavation?.resolve === resolve) {
+          this.finishExcavation();
+          this.render();
+        }
+      }, Math.ceil(timeline.total * 1000) + 500);
     });
   }
 

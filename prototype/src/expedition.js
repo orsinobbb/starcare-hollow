@@ -42,6 +42,7 @@ export function createExpeditionController({ root = document, townController, on
   let selectedTile = { x: 1, y: 0 };
   let isAnimating = false;
   let queuedTile = null;
+  let queuedDoor = null;
   let recoveryTimer = null;
   const currentRunByMap = new Map();
   const ui = {
@@ -209,9 +210,13 @@ export function createExpeditionController({ root = document, townController, on
         : "下一鏟：尚未標記";
     }
     if (ui.dig) {
-      ui.dig.disabled = door ? isAnimating || !doorPermission.ok : !permission.ok;
+      ui.dig.disabled = door ? !doorPermission.ok : !permission.ok;
       ui.dig.textContent = door
-        ? doorPermission.ok ? `開啟${door.name}` : `需要鑰匙才能開門`
+        ? doorPermission.ok
+          ? isAnimating
+            ? queuedDoor ? `已預約開啟${door.name}` : `成果顯現後開啟${door.name}`
+            : `開啟${door.name}`
+          : `需要鑰匙才能開門`
         : isAnimating
         ? permission.ok
           ? queued ? `已預約下一鏟：${terrain.name}` : `預約下一鏟：${terrain.name}（-${terrain.cost}）`
@@ -367,6 +372,9 @@ export function createExpeditionController({ root = document, townController, on
     const nextTile = queuedTile;
     queuedTile = null;
     renderer.setQueuedTile(null);
+    const nextDoor = queuedDoor;
+    queuedDoor = null;
+    if (nextDoor) return requestDoor(nextDoor.x, nextDoor.y);
     if (nextTile) {
       const permission = canExcavate(state, nextTile.x, nextTile.y);
       if (permission.ok) return beginExcavation(nextTile.x, nextTile.y);
@@ -383,8 +391,20 @@ export function createExpeditionController({ root = document, townController, on
 
   async function requestDoor(x, y) {
     if (isAnimating) {
-      onNotify("請先讓這一鏟的成果完整顯現，再通過石門。");
-      return { ok: false, state, message: "挖掘演出進行中。" };
+      const permission = canEnterDoor(state, x, y);
+      if (!permission.ok) {
+        onNotify(permission.message);
+        return { ok: false, state, message: permission.message };
+      }
+      queuedDoor = { x, y };
+      queuedTile = null;
+      renderer.setQueuedTile(null);
+      selectedTile = { x, y };
+      updateStage("queued", "門", `${doorAt(state, x, y).name}已排入下一步；成果顯現後會自動開門。`);
+      if (ui.log) ui.log.textContent = "不必再點一次：目前演出結束後會自動通過石門。";
+      renderSelection();
+      onNotify("已預約開門；目前成果顯現後會自動前往下一層。");
+      return { ok: true, state, message: "已預約開門。", queued: true };
     }
     const result = enterDoor(state, x, y);
     if (!result.ok) {
@@ -401,6 +421,7 @@ export function createExpeditionController({ root = document, townController, on
     state = townResult.state.expedition;
     selectedTile = { ...activeMap(state).entry };
     queuedTile = null;
+    queuedDoor = null;
     renderer.setQueuedTile(null);
     isAnimating = false;
     renderer.setState(renderedState());
