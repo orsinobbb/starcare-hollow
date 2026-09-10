@@ -110,6 +110,14 @@ test("the game keeps a stable viewport and successful pairs celebrate without bl
   assert.match(app, /你可以繼續找下一組/);
 });
 
+test("the immersive town dock cannot inherit a mobile top edge and stretch across the screen", async () => {
+  const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
+
+  assert.match(css, /html body\[data-view="town"\] \.world-nav \{[\s\S]*?position:\s*fixed;[\s\S]*?top:\s*auto;[\s\S]*?bottom:/);
+  assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?html body\[data-view="town"\] \.world-nav \{[\s\S]*?height:\s*auto;[\s\S]*?max-height:\s*76px;/);
+  assert.match(css, /html body\[data-view="town"\] \.save-status \{ display:\s*none; \}/);
+});
+
 test("the expedition ships a mobile canvas surface with isolated gestures and deterministic state", async () => {
   const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
   const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
