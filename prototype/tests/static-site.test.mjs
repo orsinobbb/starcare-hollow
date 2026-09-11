@@ -178,7 +178,10 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(controller, /三秒成果收入背包後即可繼續/);
   assert.match(controller, /showReward/);
   assert.match(controller, /flyLoot/);
-  assert.match(controller, /await renderer\.playExcavation/);
+  assert.match(controller, /waitForAnimationSafely/);
+  assert.match(controller, /renderer\.finishExcavation/);
+  assert.match(controller, /renderer\.finishDoorTransition/);
+  assert.match(controller, /visibilitychange/);
   assert.match(controller, /resupplyExpeditionFocus/);
   assert.match(controller, /月芽暖茶/);
   assert.match(controller, /renderMission/);

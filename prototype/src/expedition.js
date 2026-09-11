@@ -36,6 +36,27 @@ function countdownText(milliseconds) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+const EXCAVATION_UNLOCK_TIMEOUT_MS = 9000;
+const DOOR_UNLOCK_TIMEOUT_MS = 2500;
+
+export function waitForAnimationSafely(animationTask, timeoutMs, timerHost = globalThis) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer = null;
+    const finish = (outcome) => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) timerHost.clearTimeout(timer);
+      resolve(outcome);
+    };
+    timer = timerHost.setTimeout(() => finish({ status: "timeout" }), timeoutMs);
+    Promise.resolve()
+      .then(animationTask)
+      .then(() => finish({ status: "completed" }))
+      .catch((error) => finish({ status: "failed", error }));
+  });
+}
+
 export function createExpeditionController({ root = document, townController, onLeave = () => {}, onNotify = () => {} } = {}) {
   const element = (selector) => root.querySelector(selector);
   const canvas = element("#expedition-canvas");
@@ -570,12 +591,26 @@ export function createExpeditionController({ root = document, townController, on
     renderSelection();
     updateStage("aim", "⌁", "鏟尖正在定位；這次翻開會先呈現完整的地層反應。");
     if (ui.log) ui.log.textContent = `挖礦者正前往${locationNameFor(x, y)}…`;
-    await renderer.playExcavation({ x, y }, result.event);
+    const animation = await waitForAnimationSafely(
+      () => renderer.playExcavation({ x, y }, result.event),
+      EXCAVATION_UNLOCK_TIMEOUT_MS
+    );
+    if (animation.status !== "completed") {
+      console.warn("Expedition excavation animation recovered", animation.error ?? animation.status);
+      try { renderer.finishExcavation(); } catch (error) { console.warn("Could not finish excavation visuals", error); }
+    }
 
-    const townResult = townController.recordExpedition(state, { ...result.event, message: result.message });
-    state = townResult.state.expedition;
-    isAnimating = false;
-    render();
+    try {
+      const townResult = townController.recordExpedition(state, { ...result.event, message: result.message });
+      state = townResult.state.expedition;
+    } catch (error) {
+      console.error("Could not persist expedition result", error);
+      onNotify("成果已保留在本次遠征，但自動儲存失敗；請先不要關閉頁面。", 3200);
+    } finally {
+      isAnimating = false;
+      renderer.setState(renderedState());
+      render();
+    }
     if (ui.log) ui.log.textContent = result.message;
     const upcoming = nextPlayableTarget();
     const nextHint = upcoming
@@ -613,14 +648,30 @@ export function createExpeditionController({ root = document, townController, on
       return result;
     }
     isAnimating = true;
+    renderSelection();
     updateStage("door", "門", `挖礦者正走向${result.event.door.name}；鑰匙不會被消耗。`);
-    await renderer.playDoorTransition({ x, y }, result.event);
-    const townResult = townController.recordExpedition(result.state, { ...result.event, message: result.message });
-    state = townResult.state.expedition;
-    selectedTile = { ...activeMap(state).entry };
-    isAnimating = false;
-    renderer.setState(renderedState());
-    render();
+    const animation = await waitForAnimationSafely(
+      () => renderer.playDoorTransition({ x, y }, result.event),
+      DOOR_UNLOCK_TIMEOUT_MS
+    );
+    if (animation.status !== "completed") {
+      console.warn("Expedition door animation recovered", animation.error ?? animation.status);
+      try { renderer.finishDoorTransition(); } catch (error) { console.warn("Could not finish door visuals", error); }
+    }
+
+    state = result.state;
+    try {
+      const townResult = townController.recordExpedition(state, { ...result.event, message: result.message });
+      state = townResult.state.expedition;
+    } catch (error) {
+      console.error("Could not persist expedition door transition", error);
+      onNotify("已進入下一層，但自動儲存失敗；請先不要關閉頁面。", 3200);
+    } finally {
+      selectedTile = { ...activeMap(state).entry };
+      isAnimating = false;
+      renderer.setState(renderedState());
+      render();
+    }
     updateStage("complete", "✦", `已抵達${activeMap(state).name}；黑暗、邊界陰影與已探索區域會分層顯示。`);
     if (ui.log) ui.log.textContent = result.message;
     onNotify(result.message, 2600);
@@ -681,6 +732,13 @@ export function createExpeditionController({ root = document, townController, on
 
   render();
 
+  const settleInterruptedAction = () => {
+    if (document.visibilityState !== "hidden" || !isAnimating) return;
+    try { renderer.finishExcavation(); } catch (error) { console.warn("Could not settle hidden excavation", error); }
+    try { renderer.finishDoorTransition(); } catch (error) { console.warn("Could not settle hidden door transition", error); }
+  };
+  document.addEventListener("visibilitychange", settleInterruptedAction);
+
   return {
     show() {
       renderer.resize();
@@ -704,6 +762,7 @@ export function createExpeditionController({ root = document, townController, on
     resupply: resupplyFocus,
     destroy: () => {
       if (recoveryTimer) window.clearInterval(recoveryTimer);
+      document.removeEventListener("visibilitychange", settleInterruptedAction);
       renderer.destroy();
     }
   };

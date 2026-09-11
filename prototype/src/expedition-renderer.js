@@ -72,6 +72,7 @@ export class ExpeditionRenderer {
     this.excavation = null;
     this.excavationTimer = null;
     this.doorTransition = null;
+    this.doorTransitionTimer = null;
     this.minerTile = { x: 0, y: 0 };
     this.movement = null;
     this.minerFacing = 1;
@@ -135,6 +136,7 @@ export class ExpeditionRenderer {
     if (this.frameHandle) cancelAnimationFrame(this.frameHandle);
     this.frameHandle = null;
     this.finishExcavation();
+    this.finishDoorTransition();
   }
 
   destroy() {
@@ -314,11 +316,26 @@ export class ExpeditionRenderer {
     if (!animation) return;
     if (this.excavationTimer) window.clearTimeout(this.excavationTimer);
     this.excavationTimer = null;
-    this.emitExcavationStage("settle");
     this.minerTile = { ...animation.tile };
     this.excavation = null;
     this.shake = { x: 0, y: 0, energy: 0 };
-    animation.resolve?.();
+    try {
+      this.onStage({ stage: "settle", tile: animation.tile, event: animation.event });
+    } catch (error) {
+      console.warn("Could not render excavation settlement", error);
+    } finally {
+      animation.resolve?.();
+    }
+  }
+
+  finishDoorTransition() {
+    const transition = this.doorTransition;
+    if (!transition) return;
+    if (this.doorTransitionTimer) window.clearTimeout(this.doorTransitionTimer);
+    this.doorTransitionTimer = null;
+    this.minerTile = { ...transition.tile };
+    this.doorTransition = null;
+    transition.resolve?.();
   }
 
   spawnBurst(tile, terrain, count, shape) {
@@ -662,8 +679,6 @@ export class ExpeditionRenderer {
         rewardBurst: false,
         resolve
       };
-      this.emitExcavationStage("walk");
-      this.render();
       // Mobile browsers can suspend requestAnimationFrame while the page is
       // backgrounded. Always keep a real-time completion fallback so the
       // controller can never remain permanently locked in an animation.
@@ -673,6 +688,13 @@ export class ExpeditionRenderer {
           this.render();
         }
       }, Math.ceil(timeline.total * 1000) + 500);
+      try {
+        this.emitExcavationStage("walk");
+        this.render();
+      } catch (error) {
+        console.warn("Could not start excavation visuals", error);
+        this.finishExcavation();
+      }
     });
   }
 
@@ -683,15 +705,20 @@ export class ExpeditionRenderer {
     this.movement = null;
     if (Math.abs(tile.x - origin.x) > 0.04) this.minerFacing = tile.x >= origin.x ? 1 : -1;
     return new Promise((resolve) => {
-      this.doorTransition = { tile: { ...tile }, origin, event, startedAt: performance.now(), duration };
-      this.onStage({ stage: "door", tile, event });
-      this.spawnBurst(tile, terrainAt(this.state, tile.x, tile.y), 20, "star");
-      window.setTimeout(() => {
-        this.minerTile = { ...tile };
-        this.doorTransition = null;
-        resolve();
-        this.render();
+      this.doorTransition = { tile: { ...tile }, origin, event, startedAt: performance.now(), duration, resolve };
+      this.doorTransitionTimer = window.setTimeout(() => {
+        if (this.doorTransition?.resolve === resolve) {
+          this.finishDoorTransition();
+          this.render();
+        }
       }, duration);
+      try {
+        this.onStage({ stage: "door", tile, event });
+        this.spawnBurst(tile, terrainAt(this.state, tile.x, tile.y), 20, "star");
+      } catch (error) {
+        console.warn("Could not start door transition visuals", error);
+        this.finishDoorTransition();
+      }
     });
   }
 
