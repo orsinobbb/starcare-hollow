@@ -9,7 +9,7 @@
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
     />
     <title>星癒小鎮｜小鎮核心原型</title>
-    <link rel="stylesheet" href="./styles.css?v=0.13.2" />
+    <link rel="stylesheet" href="./styles.css?v=0.13.3" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
@@ -19,7 +19,7 @@
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">✦</span>
           <div>
-            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.13.2</span></p>
+            <p class="eyebrow">STARCARE HOLLOW · <span id="version-label">CORE v0.13.3</span></p>
             <h1>星癒小鎮</h1>
           </div>
         </div>
@@ -341,17 +341,20 @@
           </section>
 
           <section id="expedition-mission" class="expedition-mission" aria-live="polite">
-            <div class="expedition-mission-copy">
+            <button id="expedition-mission-toggle" class="expedition-mission-toggle" type="button" aria-expanded="false" aria-controls="expedition-mission-details">
               <span class="expedition-mission-kicker">本層任務</span>
               <strong id="expedition-objective-title">找出月藤鑰匙</strong>
+              <span class="expedition-mission-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div id="expedition-mission-details" class="expedition-mission-details" hidden>
               <small id="expedition-objective-detail">點擊發光的星標挖掘；每一格都有收穫。</small>
+              <ol class="expedition-goal-steps" aria-label="本層探索步驟">
+                <li id="expedition-step-dig" data-state="current"><span>1</span>挖亮點</li>
+                <li id="expedition-step-key" data-state="pending"><span>2</span>找鑰匙</li>
+                <li id="expedition-step-door" data-state="pending"><span>3</span>開石門</li>
+              </ol>
+              <span class="expedition-symbol-legend"><b>✦</b> 發光星標＝可以挖</span>
             </div>
-            <ol class="expedition-goal-steps" aria-label="本層探索步驟">
-              <li id="expedition-step-dig" data-state="current"><span>1</span>挖亮點</li>
-              <li id="expedition-step-key" data-state="pending"><span>2</span>找鑰匙</li>
-              <li id="expedition-step-door" data-state="pending"><span>3</span>開石門</li>
-            </ol>
-            <span class="expedition-symbol-legend"><b>✦</b> 發光星標＝可以挖</span>
           </section>
 
           <section id="expedition-tutorial" class="expedition-tutorial" role="dialog" aria-modal="true" aria-labelledby="expedition-tutorial-title" hidden>
@@ -658,6 +661,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <script type="module" src="./src/app.js?v=0.13.2"></script>
+    <script type="module" src="./src/app.js?v=0.13.3"></script>
   </body>
 </html>

@@ -133,6 +133,9 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(html, /id="expedition-queue"/);
   assert.match(html, /id="expedition-resupply"/);
   assert.match(html, /id="expedition-mission"/);
+  assert.match(html, /id="expedition-mission-toggle"/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /id="expedition-mission-details"[^>]*hidden/);
   assert.match(html, /id="expedition-objective-title"/);
   assert.match(html, /id="expedition-tutorial"[^>]*role="dialog"/);
   assert.match(html, /id="expedition-tutorial-start"/);

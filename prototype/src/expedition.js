@@ -92,6 +92,8 @@ export function createExpeditionController({ root = document, townController, on
     stage: element("#expedition-stage"),
     controls: element("#expedition-map-controls"),
     mission: element("#expedition-mission"),
+    missionToggle: element("#expedition-mission-toggle"),
+    missionDetails: element("#expedition-mission-details"),
     objectiveTitle: element("#expedition-objective-title"),
     objectiveDetail: element("#expedition-objective-detail"),
     stepDig: element("#expedition-step-dig"),
@@ -433,6 +435,14 @@ export function createExpeditionController({ root = document, townController, on
     if (element) element.dataset.state = value;
   }
 
+  function setMissionExpanded(expanded) {
+    if (!ui.mission || !ui.missionToggle || !ui.missionDetails) return;
+    ui.mission.classList.toggle("is-expanded", expanded);
+    ui.missionToggle.setAttribute("aria-expanded", String(expanded));
+    ui.missionToggle.setAttribute("aria-label", expanded ? "收合本層任務詳情" : "展開本層任務詳情");
+    ui.missionDetails.hidden = !expanded;
+  }
+
   function renderMission() {
     const map = activeMap(state);
     const explored = Math.max(0, state.revealed.length - 1);
@@ -699,6 +709,10 @@ export function createExpeditionController({ root = document, townController, on
   ui.closeSupply?.addEventListener("click", () => setSupplyOpen(false));
   ui.help?.addEventListener("click", () => setTutorialOpen(true));
   ui.tutorialStart?.addEventListener("click", beginGuidedPlay);
+  ui.missionToggle?.addEventListener("click", () => {
+    setMissionExpanded(ui.missionToggle.getAttribute("aria-expanded") !== "true");
+  });
+  canvas.addEventListener("pointerdown", () => setMissionExpanded(false), { passive: true });
   ui.openBag?.addEventListener("click", () => {
     renderBag();
     setOverlay(ui.bagPanel, true, ui.closeBag);
@@ -741,6 +755,7 @@ export function createExpeditionController({ root = document, townController, on
 
   return {
     show() {
+      setMissionExpanded(false);
       renderer.resize();
       renderer.start();
       render();
