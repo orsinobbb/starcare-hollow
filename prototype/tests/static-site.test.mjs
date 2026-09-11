@@ -183,6 +183,10 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(controller, /月芽暖茶/);
   assert.match(controller, /renderMission/);
   assert.match(controller, /nextPlayableTarget/);
+  const excavationFlow = controller.match(/async function beginExcavation[\s\S]*?\n  function requestExcavate/)?.[0] ?? "";
+  assert.doesNotMatch(excavationFlow, /renderer\.guideToTile\(/, "成果入袋後不得自動移動鏡頭");
+  assert.match(controller, /鏡頭穩定原則：成果入袋只能更新 HUD 與提示/);
+  assert.match(html, /成果入袋只更新背包與提示，不會拉走鏡頭/);
   assert.match(controller, /starcare-expedition-tutorial-v1/);
   assert.match(expedition, /createExpeditionState/);
   assert.match(expedition, /compassClue/);

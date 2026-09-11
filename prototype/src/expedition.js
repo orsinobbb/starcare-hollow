@@ -577,22 +577,22 @@ export function createExpeditionController({ root = document, townController, on
     isAnimating = false;
     render();
     if (ui.log) ui.log.textContent = result.message;
+    const upcoming = nextPlayableTarget();
+    const nextHint = upcoming
+      ? ` 下一個可探索點是${locationNameFor(upcoming.x, upcoming.y)}；等你親自點選後才會移動。`
+      : "";
     updateStage("complete", result.event.type === "discovery" ? "✧" : result.event.type === "key" ? "🔑" : "✓",
       result.event.type === "discovery"
-        ? `已收下「${result.event.discovery.name}」；它已記入星願手札。`
+        ? `已收下「${result.event.discovery.name}」；它已記入星願手札。${nextHint}`
         : result.event.type === "key"
-        ? `已取得「${result.event.key.name}」；現在可前往本層石門。`
-        : `${result.event.terrain.name} 已保存，羅盤也已更新。`);
+        ? `已取得「${result.event.key.name}」；現在可前往本層石門。${nextHint}`
+        : `${result.event.terrain.name} 已保存，羅盤也已更新。${nextHint}`);
     onNotify(result.event.completed
       ? "星砂群島的主要寶物已全數找回；地圖與收藏都會永久保留。"
       : result.message, result.event.type === "discovery" ? 3200 : 1800);
     if (result.event.completed) showCollectionComplete();
-    const upcoming = nextPlayableTarget();
-    if (upcoming) {
-      selectedTile = { x: upcoming.x, y: upcoming.y };
-      renderer.guideToTile(upcoming.x, upcoming.y);
-      renderSelection();
-    }
+    // 鏡頭穩定原則：成果入袋只能更新 HUD 與提示，不得改變選取格或鏡頭。
+    // 下一步必須由玩家親自點選；guideToTile 僅保留給明確按下的教學／提示操作。
     return result;
   }
 
