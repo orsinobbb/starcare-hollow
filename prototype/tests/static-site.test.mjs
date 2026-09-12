@@ -118,6 +118,15 @@ test("the immersive town dock cannot inherit a mobile top edge and stretch acros
   assert.match(css, /html body\[data-view="town"\] \.save-status \{ display:\s*none; \}/);
 });
 
+test("town landmarks keep a stable touch target while guidance glow animates separately", async () => {
+  const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
+
+  assert.match(css, /\.town-place-hitbox\s*\{[\s\S]*?touch-action:\s*manipulation/);
+  assert.match(css, /\.town-building:not\(\.is-open\):hover\s*\{[\s\S]*?transform:\s*translate\(-50%,\s*-50%\)/);
+  assert.match(css, /\.town-building\.is-next:not\(\.is-open\)\s*\{\s*animation:\s*none/);
+  assert.match(css, /\.town-building\.is-next:not\(\.is-open\)::before\s*\{\s*animation:\s*town-landmark-glow/);
+});
+
 test("the expedition ships a mobile canvas surface with isolated gestures and deterministic state", async () => {
   const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
   const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");

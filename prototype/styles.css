@@ -6994,6 +6994,52 @@ html body[data-view="town"] .town-building:has(.town-place-hitbox:focus-visible)
   box-shadow: 0 0 0 3px rgba(35, 27, 10, 0.72), 0 0 30px rgba(255, 222, 117, 0.95), inset 0 0 18px rgba(255, 250, 220, 0.42);
 }
 
+/* v0.13.4 — keep town landmarks physically still while their light reacts. */
+html body[data-view="town"] .town-place-hitbox {
+  min-width: 44px;
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+html body[data-view="town"] .town-building:not(.is-open):hover {
+  filter: brightness(1.12);
+  transform: translate(-50%, -50%);
+}
+
+html body[data-view="town"] .town-building.is-next:not(.is-open) {
+  animation: none;
+}
+
+html body[data-view="town"] .town-building.is-next:not(.is-open)::before {
+  animation: town-landmark-glow 1.9s ease-in-out infinite;
+}
+
+@keyframes town-landmark-glow {
+  50% {
+    filter: brightness(1.15) drop-shadow(0 0 12px rgba(255, 219, 117, 0.44));
+  }
+}
+
+@media (max-height: 620px) and (orientation: landscape) {
+  html body[data-view="town"] .town-building:not(.is-open):hover {
+    transform: translate(-50%, -50%) scale(0.82);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  html body[data-view="town"] .town-building:not(.is-open):hover {
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body[data-view="town"] .town-building.is-next:not(.is-open)::before {
+    animation: none;
+  }
+}
+
 /* v0.13 — readable RPG status, inventory and respected action feedback */
 [hidden] { display: none !important; }
 
