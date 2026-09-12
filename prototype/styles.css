@@ -7082,13 +7082,23 @@ body[data-view="expedition"] .expedition-hud {
 .expedition-hud-action { min-width: 0; padding: 6px 4px; color: #fff0c0; font: inherit; font-size: .68rem; border: 1px solid rgba(255,224,145,.36); border-radius: 10px; background: rgba(29,69,70,.8); }
 .expedition-hud-action span { display: block; font-size: 1rem; }
 
-.expedition-reward-card { position: fixed; z-index: 72; left: 50%; top: 43%; width: min(330px, calc(100vw - 40px)); padding: 20px 22px; text-align: center; color: #fff5d2; border: 1px solid #f5d882; border-radius: 24px; background: radial-gradient(circle at 50% 0, rgba(77,142,121,.94), rgba(8,26,44,.97) 68%); box-shadow: 0 0 0 999px rgba(3,9,22,.14), 0 0 50px rgba(255,220,112,.42); transform: translate(-50%,-50%); pointer-events: none; }
-.expedition-reward-card.is-showing { animation: reward-reveal 3s both; }
-.expedition-reward-card > span { display: block; font-size: 3.2rem; filter: drop-shadow(0 0 12px #ffe38b); }
-.expedition-reward-card small { color: #bde5d6; letter-spacing: .12em; }
-.expedition-reward-card strong { display: block; margin-top: 4px; font-size: 1.35rem; }
-.expedition-reward-card p { margin: 5px 0 0; color: #ffe59c; }
-@keyframes reward-reveal { 0%{opacity:0;transform:translate(-50%,-40%) scale(.72)} 12%,82%{opacity:1;transform:translate(-50%,-50%) scale(1)} 100%{opacity:0;transform:translate(-50%,-54%) scale(1.04)} }
+.expedition-reward-card { position: fixed; z-index: 72; left: 50%; bottom: max(6.4rem,calc(env(safe-area-inset-bottom) + 5.6rem)); display: grid; grid-template-columns: 58px minmax(0,1fr); width: min(390px,calc(100vw - 24px)); padding: 13px 14px; text-align: left; color: #fff5d2; border: 1px solid #f5d882; border-radius: 20px; background: radial-gradient(circle at 10% 0,rgba(74,143,122,.98),rgba(8,26,44,.97) 72%); box-shadow: 0 14px 38px rgba(0,0,0,.44),0 0 24px rgba(255,220,112,.3),inset 0 1px rgba(255,255,255,.18); transform: translateX(-50%); pointer-events: none; }
+.expedition-reward-card.is-showing { animation: reward-reveal .42s cubic-bezier(.18,.85,.26,1.18) both; }
+.expedition-reward-card.is-leaving { animation: reward-leave .22s ease both; }
+.expedition-reward-card > span { grid-row:1 / span 4; display:grid; place-items:center; align-self:center; width:50px;height:50px;font-size:2.25rem;border:1px solid rgba(255,232,154,.55);border-radius:16px;background:rgba(255,255,255,.09);filter:drop-shadow(0 0 10px #ffe38b); }
+.expedition-reward-card small { color:#c9f0df;letter-spacing:.08em;font-size:.66rem;font-weight:800; }
+.expedition-reward-card strong { display:block;margin-top:1px;font-size:1.18rem;line-height:1.2; }
+.expedition-reward-card p { margin:3px 0 0;color:#d9eee5;font-size:.74rem;line-height:1.35; }
+.expedition-reward-items { grid-column:2;display:flex;flex-wrap:wrap;gap:5px;margin-top:7px; }
+.expedition-reward-items span { padding:4px 7px;color:#fff1b5;font-size:.72rem;font-weight:700;border:1px solid rgba(255,226,143,.25);border-radius:999px;background:rgba(3,15,29,.38); }
+.expedition-reward-items i { margin-right:3px;font-style:normal; }
+.expedition-reward-items b { color:#fff; }
+.expedition-reward-card footer { grid-column:1 / -1;display:flex;justify-content:space-between;gap:10px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);font-size:.66rem; }
+.expedition-reward-card footer span { color:#ffe49a;font-weight:800; }
+.expedition-reward-card footer em { color:#aee6d4;font-style:normal;text-align:right; }
+.expedition-reward-card[data-kind="discovery"],.expedition-reward-card[data-kind="key"],.expedition-reward-card[data-kind="complete"] { border-color:#fff0a9;box-shadow:0 14px 40px rgba(0,0,0,.46),0 0 36px rgba(255,225,112,.5),inset 0 1px rgba(255,255,255,.22); }
+@keyframes reward-reveal { 0%{opacity:0;transform:translate(-50%,18px) scale(.86)} 70%{opacity:1;transform:translate(-50%,-3px) scale(1.02)} 100%{opacity:1;transform:translateX(-50%) scale(1)} }
+@keyframes reward-leave { to{opacity:0;transform:translate(-50%,-12px) scale(.97)} }
 .expedition-loot-flight-layer { position: fixed; inset: 0; z-index: 76; pointer-events: none; }
 .expedition-loot-flight { position: fixed; left: var(--loot-x); top: var(--loot-y); font-size: 1.5rem; filter: drop-shadow(0 0 7px #fff2a8); animation: loot-to-hud 1.15s cubic-bezier(.2,.75,.18,1) forwards; }
 @keyframes loot-to-hud { 0%{opacity:0;transform:translate(-50%,-50%) scale(.5)} 18%{opacity:1;transform:translate(-50%,-70%) scale(1.35)} 100%{opacity:0;transform:translate(calc(-50% + var(--loot-dx)),calc(-50% + var(--loot-dy))) scale(.4)} }
@@ -7141,7 +7151,7 @@ body[data-view="expedition"] .expedition-hud {
   .expedition-hud-action { padding:3px 5px;font-size:.57rem; }
   .expedition-hud-action span { display:inline;font-size:.72rem; }
   body[data-view="expedition"] .expedition-mission { top: 7.15rem; }
-  .expedition-reward-card { top:48%; }
+  .expedition-reward-card { bottom:max(5.5rem,calc(env(safe-area-inset-bottom) + 4.8rem)); }
   .expedition-bag-grid { grid-template-columns:repeat(2,1fr); }
   .complete-relics span { min-width:0;flex:1; }
 }

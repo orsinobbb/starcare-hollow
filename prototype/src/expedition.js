@@ -22,6 +22,7 @@ import {
   MINIMUM_DAILY_WISHES_FOR_REST
 } from "./town.js";
 import { ExpeditionRenderer } from "./expedition-renderer.js";
+import { canQueueNextAction, createExpeditionActionResult } from "./action-result.js";
 
 const EXPEDITION_TUTORIAL_KEY = "starcare-expedition-tutorial-v1";
 
@@ -65,6 +66,10 @@ export function createExpeditionController({ root = document, townController, on
   let state = townController.snapshot().expedition ?? createExpeditionState();
   let selectedTile = { x: 1, y: 0 };
   let isAnimating = false;
+  let excavationStage = "idle";
+  let activeActionResult = null;
+  let queuedExcavation = null;
+  let rewardHideTimer = null;
   let recoveryTimer = null;
   const currentRunByMap = new Map();
   const ui = {
@@ -123,6 +128,9 @@ export function createExpeditionController({ root = document, townController, on
     rewardIcon: element("#expedition-reward-icon"),
     rewardTitle: element("#expedition-reward-title"),
     rewardDetail: element("#expedition-reward-detail"),
+    rewardItems: element("#expedition-reward-items"),
+    rewardProgress: element("#expedition-reward-progress"),
+    rewardNext: element("#expedition-reward-next"),
     lootLayer: element("#expedition-loot-flight-layer"),
     completeOverlay: element("#expedition-complete-overlay"),
     completeRelics: element("#expedition-complete-relics"),
@@ -158,6 +166,7 @@ export function createExpeditionController({ root = document, townController, on
       updateStage(stage, icon, text);
     },
     onStage: ({ stage, event, tile }) => {
+      excavationStage = stage;
       const stageCopy = {
         walk: ["♟", "挖礦者正走向標記地點。"],
         aim: ["⌁", "先讓鏟尖定位，準備翻開眼前的地貌。"],
@@ -167,12 +176,13 @@ export function createExpeditionController({ root = document, townController, on
         key: ["🔑", `${event.key?.name ?? "鑰匙"}從土層升起，石門的鎖紋正與它共鳴！`],
         door: ["門", "鑰匙與石門共鳴；通往下一層的道路正在展開。"],
         reward: ["＋", `成果浮現：${formatReward(event.reward)} 正在交到你的行囊。`],
-        settle: ["✓", "地層穩定中，遠征成果即將收下。"]
+        settle: ["✓", "成果已入帳，地層正在穩定。"]
       };
       const [icon, text] = stageCopy[stage] ?? ["⌁", "遠征進行中。"];
       updateStage(stage, icon, text);
-      if (stage === "reward") showReward(event, tile);
-      if (stage === "settle") hideReward();
+      if (stage === "reward") showReward(activeActionResult, event, tile);
+      if (stage === "settle") scheduleRewardHide(900);
+      if (stage === "reward" || stage === "settle") renderSelection();
     }
   });
 
@@ -233,18 +243,31 @@ export function createExpeditionController({ root = document, townController, on
     loot.addEventListener("animationend", () => loot.remove(), { once: true });
   }
 
-  function showReward(event, tile) {
-    if (!ui.rewardCard || ui.rewardCard.dataset.eventId === `${state.digs}:${tile?.x}:${tile?.y}`) return;
-    ui.rewardCard.dataset.eventId = `${state.digs}:${tile?.x}:${tile?.y}`;
-    const special = event.type === "discovery" ? event.discovery : event.type === "key" ? event.key : null;
-    ui.rewardIcon.textContent = special?.icon ?? event.terrain.symbol ?? "✦";
-    ui.rewardTitle.textContent = special ? `發現 ${special.name}` : `挖出 ${event.terrain.name}`;
-    ui.rewardDetail.textContent = `${formatReward(event.reward)} · 將自動收入背包`;
+  function showReward(actionResult, event, tile) {
+    if (!ui.rewardCard || !actionResult || ui.rewardCard.dataset.eventId === actionResult.id) return;
+    if (rewardHideTimer !== null) window.clearTimeout(rewardHideTimer);
+    rewardHideTimer = null;
+    ui.rewardCard.dataset.eventId = actionResult.id;
+    ui.rewardCard.dataset.kind = actionResult.kind;
+    ui.rewardIcon.textContent = actionResult.icon;
+    ui.rewardTitle.textContent = actionResult.title;
+    ui.rewardDetail.textContent = actionResult.detail;
+    if (ui.rewardItems) ui.rewardItems.innerHTML = actionResult.rewards.map((reward) =>
+      `<span data-resource="${reward.id}"><i aria-hidden="true">${reward.icon}</i>${reward.label} <b>+${reward.amount}</b></span>`
+    ).join("");
+    if (ui.rewardProgress) ui.rewardProgress.textContent = actionResult.progress
+      ? `${actionResult.progress.label} ${actionResult.progress.current} / ${actionResult.progress.total}`
+      : "✓ 已收入背包";
+    if (ui.rewardNext) ui.rewardNext.textContent = queuedExcavation
+      ? `下一鏟已排定：${locationNameFor(queuedExcavation.x, queuedExcavation.y)}`
+      : actionResult.nextAction?.label ?? "成果展示完成後可繼續";
     ui.rewardCard.hidden = false;
+    ui.rewardCard.classList.remove("is-leaving");
     ui.rewardCard.classList.remove("is-showing");
     void ui.rewardCard.offsetWidth;
     ui.rewardCard.classList.add("is-showing");
     window.setTimeout(() => {
+      const special = event.type === "discovery" ? event.discovery : event.type === "key" ? event.key : null;
       if (special) flyLoot(special.icon, tile, event.type === "discovery" ? ui.openCollection : ui.openBag);
       for (const [resource, amount] of Object.entries(event.reward ?? {})) {
         const target = element(`#expedition-resource-${resource}`) ?? ui.openBag;
@@ -253,14 +276,28 @@ export function createExpeditionController({ root = document, townController, on
           window.setTimeout(() => flyLoot(meta.icon, tile, target), index * 110);
         }
       }
-    }, 1450);
+    }, 720);
   }
 
   function hideReward() {
     if (!ui.rewardCard) return;
-    ui.rewardCard.hidden = true;
     ui.rewardCard.classList.remove("is-showing");
-    delete ui.rewardCard.dataset.eventId;
+    ui.rewardCard.classList.add("is-leaving");
+    window.setTimeout(() => {
+      if (ui.rewardCard.classList.contains("is-showing")) return;
+      ui.rewardCard.hidden = true;
+      ui.rewardCard.classList.remove("is-leaving");
+      delete ui.rewardCard.dataset.eventId;
+      delete ui.rewardCard.dataset.kind;
+    }, 240);
+  }
+
+  function scheduleRewardHide(delay = 900) {
+    if (rewardHideTimer !== null) window.clearTimeout(rewardHideTimer);
+    rewardHideTimer = window.setTimeout(() => {
+      rewardHideTimer = null;
+      hideReward();
+    }, delay);
   }
 
   function showCollectionComplete() {
@@ -344,6 +381,7 @@ export function createExpeditionController({ root = document, townController, on
     const permission = canExcavate(state, selectedTile.x, selectedTile.y);
     const focusRecovery = recoverExpeditionFocus(state);
     const location = locationNameFor(selectedTile.x, selectedTile.y);
+    const queueWindow = isAnimating && canQueueNextAction(excavationStage, activeActionResult);
     if (ui.selected) ui.selected.textContent = door ? `${activeMap(state).name} · ${door.name}` : location;
     if (ui.selectedDetail) {
       ui.selectedDetail.textContent = door
@@ -351,7 +389,9 @@ export function createExpeditionController({ root = document, townController, on
           ? `石門已可開啟；進入後，本層進度與鑰匙都會永久保留。`
           : doorPermission.message
         : isAnimating
-        ? `鏟尖已落下，現在不能移動或改挖別處；成果收入背包後即可繼續。`
+        ? queueWindow
+          ? "成果正在展示；現在就能點另一個發光星標，預約下一鏟。"
+          : "鏟尖正在定位與落下；成果亮起後即可預約下一鏟。"
         : permission.ok
         ? `${terrain.name}地貌 · 踏查消耗 ${terrain.cost} 專注`
         : permission.reason === "focus"
@@ -360,17 +400,21 @@ export function createExpeditionController({ root = document, townController, on
     }
     if (ui.queue) {
       ui.queue.textContent = isAnimating
-        ? "目前狀態：挖掘鎖定 · 三秒成果入袋後恢復操作"
+        ? queueWindow
+          ? queuedExcavation
+            ? `已預約下一鏟：${locationNameFor(queuedExcavation.x, queuedExcavation.y)}`
+            : "成果已入帳 · 可點另一個發光星標預約下一鏟"
+          : "目前狀態：落鏟中 · 成果亮起後可預約下一步"
         : "移動規則：走路途中點別處會立即改道；抵達後再決定是否挖掘";
     }
     if (ui.dig) {
-      ui.dig.disabled = isAnimating || (door ? !doorPermission.ok : !permission.ok);
+      ui.dig.disabled = (isAnimating && !queueWindow) || (door ? isAnimating || !doorPermission.ok : !permission.ok);
       ui.dig.textContent = door
         ? doorPermission.ok
           ? isAnimating ? `挖掘中，暫時不能開門` : `開啟${door.name}`
           : `需要鑰匙才能開門`
         : isAnimating
-        ? "⛏ 挖掘中 · 等待成果收入背包"
+        ? queueWindow ? "↝ 預約這裡作為下一鏟" : "⛏ 挖掘中 · 成果即將亮起"
         : permission.ok
         ? `⛏ 挖掘「${location.split(" · ")[1]}」（-${terrain.cost} 專注）`
         : "這裡目前還不能踏查";
@@ -574,7 +618,7 @@ export function createExpeditionController({ root = document, townController, on
   }
 
   function rejectDuringExcavation() {
-    const message = "鏟尖已落下，現在不能移動或改挖別處；三秒成果收入背包後即可繼續。";
+    const message = "鏟尖正在落下；成果亮起後，就能先點下一個發光星標排定下一鏟。";
     renderer.playReaction("blocked");
     updateStage("locked", "⛏", message);
     if (ui.log) ui.log.textContent = message;
@@ -593,10 +637,27 @@ export function createExpeditionController({ root = document, townController, on
     }
 
     isAnimating = true;
+    excavationStage = "commit";
+    queuedExcavation = null;
     state = result.state;
     if (!currentRunByMap.has(state.activeMapId)) currentRunByMap.set(state.activeMapId, new Set());
     currentRunByMap.get(state.activeMapId).add(tileKey(x, y));
     selectedTile = { x, y };
+    try {
+      const townResult = townController.recordExpedition(state, { ...result.event, message: result.message });
+      state = townResult.state.expedition;
+    } catch (error) {
+      console.error("Could not persist expedition result", error);
+      onNotify("成果保留在本次遠征，但自動儲存失敗；請先不要關閉頁面。", 3200);
+    }
+    activeActionResult = createExpeditionActionResult({
+      event: result.event,
+      tile: { x, y },
+      digNumber: state.digs,
+      foundCount: state.foundTargetIds.length,
+      totalCount: state.targets.length,
+      resourceMeta
+    });
     renderer.setState(renderedState());
     renderSelection();
     updateStage("aim", "⌁", "鏟尖正在定位；這次翻開會先呈現完整的地層反應。");
@@ -610,17 +671,10 @@ export function createExpeditionController({ root = document, townController, on
       try { renderer.finishExcavation(); } catch (error) { console.warn("Could not finish excavation visuals", error); }
     }
 
-    try {
-      const townResult = townController.recordExpedition(state, { ...result.event, message: result.message });
-      state = townResult.state.expedition;
-    } catch (error) {
-      console.error("Could not persist expedition result", error);
-      onNotify("成果已保留在本次遠征，但自動儲存失敗；請先不要關閉頁面。", 3200);
-    } finally {
-      isAnimating = false;
-      renderer.setState(renderedState());
-      render();
-    }
+    isAnimating = false;
+    excavationStage = "idle";
+    renderer.setState(renderedState());
+    render();
     if (ui.log) ui.log.textContent = result.message;
     const upcoming = nextPlayableTarget();
     const nextHint = upcoming
@@ -637,13 +691,44 @@ export function createExpeditionController({ root = document, townController, on
       : result.message, result.event.type === "discovery" ? 3200 : 1800);
     if (result.event.completed) showCollectionComplete();
     // 鏡頭穩定原則：成果入袋只能更新 HUD 與提示，不得改變選取格或鏡頭。
-    // 下一步必須由玩家親自點選；guideToTile 僅保留給明確按下的教學／提示操作。
+    // 只有玩家在成果階段親自點選的下一鏟，才能接續執行；不由系統擅自選點。
+    const queued = queuedExcavation;
+    queuedExcavation = null;
+    activeActionResult = null;
+    if (queued) {
+      const permission = canExcavate(state, queued.x, queued.y);
+      if (permission.ok && state.focus > 0) {
+        selectedTile = { x: queued.x, y: queued.y };
+        renderer.setKeyboardTile(queued.x, queued.y);
+        updateStage("queued", "↝", `接續前往${locationNameFor(queued.x, queued.y)}，準備下一鏟。`);
+        window.setTimeout(() => beginExcavation(queued.x, queued.y), 180);
+      } else {
+        onNotify(permission.message ?? "下一鏟暫時無法進行，請重新選擇發光星標。", 2200);
+      }
+    }
     return result;
   }
 
   function requestExcavate(x, y) {
     synchronizePassiveFocus();
-    if (isAnimating) return rejectDuringExcavation();
+    if (isAnimating) {
+      if (!canQueueNextAction(excavationStage, activeActionResult)) return rejectDuringExcavation();
+      const permission = canExcavate(state, x, y);
+      if (!permission.ok) {
+        renderer.playReaction(permission.reason ?? "blocked");
+        onNotify(permission.message, 1800);
+        return { ok: false, state, message: permission.message, event: null };
+      }
+      queuedExcavation = { x, y };
+      selectedTile = { x, y };
+      renderer.setKeyboardTile(x, y);
+      const message = `下一鏟已排定：${locationNameFor(x, y)}。目前成果會繼續播放，不必等待。`;
+      if (ui.rewardNext) ui.rewardNext.textContent = message;
+      if (ui.log) ui.log.textContent = message;
+      updateStage("queued", "↝", message);
+      renderSelection();
+      return { ok: true, state, message, event: { type: "queued", x, y } };
+    }
     return beginExcavation(x, y);
   }
 
@@ -660,6 +745,14 @@ export function createExpeditionController({ root = document, townController, on
     isAnimating = true;
     renderSelection();
     updateStage("door", "門", `挖礦者正走向${result.event.door.name}；鑰匙不會被消耗。`);
+    let committedState = result.state;
+    try {
+      const townResult = townController.recordExpedition(committedState, { ...result.event, message: result.message });
+      committedState = townResult.state.expedition;
+    } catch (error) {
+      console.error("Could not persist expedition door transition", error);
+      onNotify("通往下一層的進度暫時無法自動儲存；請先不要關閉頁面。", 3200);
+    }
     const animation = await waitForAnimationSafely(
       () => renderer.playDoorTransition({ x, y }, result.event),
       DOOR_UNLOCK_TIMEOUT_MS
@@ -669,19 +762,11 @@ export function createExpeditionController({ root = document, townController, on
       try { renderer.finishDoorTransition(); } catch (error) { console.warn("Could not finish door visuals", error); }
     }
 
-    state = result.state;
-    try {
-      const townResult = townController.recordExpedition(state, { ...result.event, message: result.message });
-      state = townResult.state.expedition;
-    } catch (error) {
-      console.error("Could not persist expedition door transition", error);
-      onNotify("已進入下一層，但自動儲存失敗；請先不要關閉頁面。", 3200);
-    } finally {
-      selectedTile = { ...activeMap(state).entry };
-      isAnimating = false;
-      renderer.setState(renderedState());
-      render();
-    }
+    state = committedState;
+    selectedTile = { ...activeMap(state).entry };
+    isAnimating = false;
+    renderer.setState(renderedState());
+    render();
     updateStage("complete", "✦", `已抵達${activeMap(state).name}；黑暗、邊界陰影與已探索區域會分層顯示。`);
     if (ui.log) ui.log.textContent = result.message;
     onNotify(result.message, 2600);

@@ -929,3 +929,11 @@ window.requestAnimationFrame(frame);
 if (params.get("view") === "clinic") $("#start-button").focus();
 else if (params.get("view") === "expedition") $("#expedition-canvas").focus();
 else $("#enter-clinic").focus();
+
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((error) => {
+      console.warn("星癒小鎮離線服務未啟用：", error);
+    });
+  }, { once: true });
+}

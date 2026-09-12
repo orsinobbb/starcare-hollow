@@ -34,6 +34,25 @@ test("displayed app version stays aligned with package metadata", async () => {
   assert.ok(SAVE_SCHEMA_VERSION >= 1);
 });
 
+test("the installable game identity ships with local icons and an update-safe service worker", async () => {
+  const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
+  const manifest = JSON.parse(await readFile(new URL("manifest.webmanifest", siteRootUrl), "utf8"));
+  const app = await readFile(new URL("src/app.js", siteRootUrl), "utf8");
+  const serviceWorker = await readFile(new URL("sw.js", siteRootUrl), "utf8");
+
+  assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
+  assert.match(html, /rel="apple-touch-icon" href="\.\/assets\/icons\/apple-touch-icon\.png"/);
+  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.start_url, "./");
+  assert.equal(manifest.icons.some((icon) => icon.purpose === "maskable"), true);
+  await Promise.all(manifest.icons.map((icon) => access(new URL(icon.src, siteRootUrl))));
+  await access(new URL("assets/icons/apple-touch-icon.png", siteRootUrl));
+  await access(new URL("assets/icons/favicon-32.png", siteRootUrl));
+  assert.match(app, /navigator\.serviceWorker\.register\("\.\/sw\.js"\)/);
+  assert.match(serviceWorker, /starcare-shell-v0\.14\.0/);
+  assert.match(serviceWorker, /request\.mode === "navigate"/);
+});
+
 test("town shell, controller, and versioned save contract ship together", async () => {
   const html = await readFile(new URL("index.html", siteRootUrl), "utf8");
   const css = await readFile(new URL("styles.css", siteRootUrl), "utf8");
@@ -187,7 +206,9 @@ test("the expedition ships a mobile canvas surface with isolated gestures and de
   assert.match(controller, /requestExcavate/);
   assert.match(controller, /onMove/);
   assert.match(controller, /輕觸空地可移動/);
-  assert.match(controller, /三秒成果收入背包後即可繼續/);
+  assert.match(controller, /成果已入帳 · 可點另一個發光星標預約下一鏟/);
+  assert.match(controller, /canQueueNextAction/);
+  assert.match(controller, /queuedExcavation/);
   assert.match(controller, /showReward/);
   assert.match(controller, /flyLoot/);
   assert.match(controller, /waitForAnimationSafely/);

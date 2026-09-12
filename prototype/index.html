@@ -4,6 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#18243f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="星癒小鎮" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./assets/icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
     <meta
       name="description"
       content="《星癒小鎮》小鎮經營、永久收藏與可愛搭檔小遊戲的可玩原型"
@@ -385,17 +391,18 @@
               <canvas id="expedition-canvas" tabindex="0" aria-label="穹星礦場踏查地圖" aria-describedby="expedition-map-help"></canvas>
               <div id="expedition-reward-card" class="expedition-reward-card" role="status" aria-live="assertive" hidden>
                 <span id="expedition-reward-icon" aria-hidden="true">✦</span>
-                <small>本次挖掘成果</small>
+                <small>✓ 本次挖掘成果已入帳</small>
                 <strong id="expedition-reward-title">星砂</strong>
-                <p id="expedition-reward-detail">星幣 +4</p>
-                <em>正在收入背包…</em>
+                <p id="expedition-reward-detail">成果已可靠收入背包。</p>
+                <div id="expedition-reward-items" class="expedition-reward-items"></div>
+                <footer><span id="expedition-reward-progress">主要寶物 0 / 6</span><em id="expedition-reward-next">可直接預約下一鏟</em></footer>
               </div>
               <div id="expedition-loot-flight-layer" class="expedition-loot-flight-layer" aria-hidden="true"></div>
               <div id="expedition-stage" class="expedition-stage" data-stage="ready" role="status" aria-live="polite">
                 <span aria-hidden="true">⌁</span>
                 <p>挖礦者會前往星標、落鏟、翻開地貌，再把每處成果清楚交到你手上。</p>
               </div>
-              <p id="expedition-map-help" class="expedition-map-help"><strong>直接指揮她：</strong>輕觸空地，她會走到指定位置；途中可再點別處立即改道。輕觸亮起的星標，她會前往、落鏟、清土並親手收下成果。落鏟後會鎖定操作，成果展示三秒並收入背包後才能再移動。單指拖曳用來查看遠方地貌；世界比例固定，雙指不會縮放。</p>
+              <p id="expedition-map-help" class="expedition-map-help"><strong>直接指揮她：</strong>輕觸空地，她會走到指定位置；途中可再點別處立即改道。輕觸亮起的星標，她會前往、落鏟、清土並親手收下成果。鏟尖落地時短暫鎖定；成果亮起後可直接點下一個發光星標，預約下一鏟。單指拖曳用來查看遠方地貌；世界比例固定，雙指不會縮放。</p>
               <p id="expedition-log" class="expedition-log" role="status" aria-live="polite">入口營地已整備：先選擇旁邊亮起的礦點，開始踏查星砂淺層。</p>
             </section>
 
@@ -434,7 +441,7 @@
                 <ul>
                   <li>已踏查的地點與找到的寶物永久保存。</li>
                   <li>專注每 5 分鐘自然回復 1 點；月芽暖茶可即時補給，居民委託仍可留到明日。</li>
-                  <li>移動中可隨時改道；落鏟後會暫時鎖定，完整看完三秒成果才恢復指揮。</li>
+                  <li>移動中可隨時改道；鏟尖落下時短暫鎖定，成果亮起後就能預約下一鏟。</li>
                   <li>成果入袋只更新背包與提示，不會拉走鏡頭；移動視野永遠由你決定。</li>
                 </ul>
               </section>
